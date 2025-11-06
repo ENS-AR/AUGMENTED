@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>RA : Logo Fixe et Petit</title>
+  <title>RA : Texte Automatique</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     body, html {
@@ -17,12 +17,12 @@
       padding: 10px 15px; border-radius: 8px;
       font-size: 14px; text-align: center; z-index: 2;
     }
-    /* Style CLE : positionnement fixe pour le logo */
+    /* Logo fixe et petit en bas à droite */
     #logo {
-      position: fixed; /* Assure qu'il reste fixe par rapport à la fenêtre de visualisation */
+      position: fixed; 
       bottom: 10px; right: 10px; 
-      z-index: 2; /* S'assure qu'il est au-dessus de la scène 3D */
-      width: 60px; /* Taille petite demandée */
+      z-index: 2; 
+      width: 60px; 
       opacity: 0.8;
     }
   </style>
@@ -32,26 +32,23 @@
 </head>
 <body>
   <div id="overlay">
-    <b>🪄 Réalité Augmentée :</b> Cube blanc en affichage automatique. Touchez l'écran pour le redimensionner.
+    <b>🪄 Réalité Augmentée :</b> Pointez la caméra vers le marqueur **Hiro**. Le message s'affiche automatiquement.
   </div>
 
-    <img id="logo" src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Logo_Terre.png" alt="Logo" />
+    <img id="logo" src="LogoAR.png" alt="Logo" />
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;">
     
-        <a-entity light="type: ambient; intensity: 0.8; color: #fff"></a-entity>
-    <a-entity light="type: directional; intensity: 0.7; color: #fff" position="1 1 0.5"></a-entity>
+        <a-entity light="type: ambient; intensity: 1.0; color: #fff"></a-entity>
 
         <a-marker preset="hiro">
-            <a-box id="objet3d"
-        color="#FFFFFF" 
-        depth="0.5" height="0.5" width="0.5" 
-        rotation="0 0 0"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"
-        position="0 0.25 0">
-      </a-box>
-
-            <a-plane rotation="-90 0 0" width="1.5" height="1.5" color="#111" opacity="0.4" id="ombre"></a-plane>
+            <a-text id="arText"
+        value="TEST AR" 
+        color="#FF00FF" 
+        align="center" 
+        width="2" 
+        rotation="-90 0 0"         position="0 0.1 0">       </a-text>
+        
     </a-marker>
 
         <a-entity camera></a-entity>
@@ -59,29 +56,19 @@
   </a-scene>
 
   <script>
-    const objet3d = document.getElementById('objet3d');
+    // Le texte s'affiche automatiquement, aucun code JavaScript n'est nécessaire pour l'affichage.
+    // Cependant, vous pourriez ajouter de l'interactivité ou une animation ici si nécessaire.
     
-    // Tailles pour le changement au clic
-    const tailles = [
-        { w: 0.5, h: 0.5, d: 0.5 },
-        { w: 0.8, h: 0.8, d: 0.8 },
-        { w: 0.3, h: 0.3, d: 0.3 }
-    ];
-    let currentIndex = 0;
-
-    window.addEventListener('click', () => {
-        // Logique pour changer la taille de l'objet au clic
-        currentIndex = (currentIndex + 1) % tailles.length;
-        const nextSize = tailles[currentIndex];
-        
-        // Appliquer la nouvelle taille
-        objet3d.setAttribute('width', nextSize.w);
-        objet3d.setAttribute('height', nextSize.h);
-        objet3d.setAttribute('depth', nextSize.d);
-        
-        // Mise à jour de la position pour centrer sur le marqueur
-        objet3d.setAttribute('position', `0 ${nextSize.h / 2} 0`);
-    });
+    // Exemple d'animation : faire pulser la couleur du texte
+    const arText = document.getElementById('arText');
+    arText.setAttribute('animation__color', {
+        property: 'color',
+        from: '#FF00FF', // Magenta
+        to: '#FFFF00', // Jaune
+        dir: 'alternate',
+        loop: true,
+        dur: 1500 
+    });
   </script>
 </body>
 </html>

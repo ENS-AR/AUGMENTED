@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>RA : Objet au Clic</title>
+  <title>RA : Cube Blanc au Clic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     body, html {
@@ -14,17 +14,27 @@
     #overlay {
       position: absolute;
       top: 8px; left: 8px;
-      background: rgba(0,0,0,0.6); /* Arrière-plan plus foncé pour l'instruction */
+      background: rgba(0,0,0,0.6);
       padding: 12px 15px;
       border-radius: 8px;
       font-size: 16px;
       text-align: center;
       z-index: 2;
-      width: calc(100% - 32px); /* Pleine largeur pour mobile */
+      width: calc(100% - 32px);
     }
+    /* Style pour positionner le logo en bas à droite */
     #logo {
-      position: absolute; bottom: 10px; right: 10px; z-index: 2; width: 80px; opacity: 0.7;
+      position: absolute;
+      bottom: 10px; /* Positionnement en bas */
+      right: 10px; /* Positionnement à droite */
+      z-index: 2;
+      width: 80px; /* Taille du logo */
+      opacity: 0.8;
+      transition: opacity 0.3s;
     }
+    #logo:hover {
+        opacity: 1.0;
+    }
   </style>
 
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -33,63 +43,73 @@
 <body>
   <div id="overlay">
     <b>🪄 Réalité Augmentée :</b> Pointez la caméra vers le marqueur **Hiro**.<br>
-    👆 **TOUCHEZ l'écran** pour faire apparaître l'objet 3D !
+    👆 **TOUCHEZ l'écran** pour faire apparaître l'objet 3D blanc !
   </div>
 
-  <img id="logo" src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Logo_Terre.png" alt="Logo" />
+    <img id="logo" src="LogoAr.png" alt="Logo de démonstration" />
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-    <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-    <a-entity light="type: directional; intensity: 0.6" position="1 1 0.5"></a-entity>
+    <a-entity light="type: ambient; intensity: 1.0; color: #fff"></a-entity>
+    <a-entity light="type: directional; intensity: 0.8; color: #fff" position="1 1 0.5"></a-entity>
 
         <a-marker preset="hiro">
-            <a-entity id="terre"
-        gltf-model="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/EarthSatellite/glTF-Binary/EarthSatellite.glb"
-        scale="0.3 0.3 0.3"
+            <a-box id="objet3d"
+        color="#FFFFFF" 
+        depth="0.5" height="0.5" width="0.5" 
         rotation="0 0 0"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear"
-        position="0 0 0"
-        **visible="false"**>       </a-entity>
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"
+        position="0 0.25 0"
+        **visible="false"**> 
+      </a-box>
 
-            <a-plane rotation="-90 0 0" width="2" height="2" color="#111" opacity="0.2" **visible="false"** id="ombre"></a-plane>
+            <a-plane rotation="-90 0 0" width="1.5" height="1.5" color="#111" opacity="0.4" **visible="false"** id="ombre"></a-plane>
     </a-marker>
 
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    const terre = document.getElementById('terre');
+    const objet3d = document.getElementById('objet3d');
     const ombre = document.getElementById('ombre');
     const overlay = document.getElementById('overlay');
     let isVisible = false;
 
     window.addEventListener('click', () => {
-        // Si l'objet n'est pas encore visible (le premier clic)
+        // Le premier clic fait apparaître l'objet
         if (!isVisible) {
-            // Rendre l'objet et l'ombre visibles
-            terre.setAttribute('visible', true);
+            objet3d.setAttribute('visible', true);
             ombre.setAttribute('visible', true);
             isVisible = true;
             
-            // Masquer l'instruction après la première apparition
-            overlay.style.display = 'none';
+            // Met à jour l'instruction
+            overlay.innerHTML = '<b>✅ Objet Affiché !</b> Touchez à nouveau pour changer sa taille.';
 
         } else {
-            // Le code existant pour changer la taille peut être réintégré ici
-            // Ex: Changer la taille (comme dans votre script original)
+            // Clics suivants : Changer la taille de l'objet
             let taille = 0;
             const tailles = [
-                { scale: '0.3 0.3 0.3' },
                 { scale: '0.5 0.5 0.5' },
-                { scale: '0.2 0.2 0.2' }
+                { scale: '0.8 0.8 0.8' },
+                { scale: '0.3 0.3 0.3' }
             ];
 
-            // Trouver la taille actuelle et passer à la suivante (simplement pour illustrer)
-            const currentScale = terre.getAttribute('scale');
-            let currentIndex = tailles.findIndex(t => t.scale === `${currentScale.x} ${currentScale.y} ${currentScale.z}`);
+            // Lire la taille actuelle (A-Frame retourne un objet {x, y, z})
+            const currentScale = objet3d.components.geometry.data;
             
+            // Trouver l'index dans notre tableau de tailles
+            let currentIndex = tailles.findIndex(t => t.scale.startsWith(`${currentScale.width} ${currentScale.height} ${currentScale.depth}`));
+            
+            // Calculer l'index suivant
             taille = (currentIndex + 1) % tailles.length;
-            terre.setAttribute('scale', tailles[taille].scale);
+            
+            // Appliquer la nouvelle taille (ici on utilise setAttribute sur le composant box)
+            const newScale = tailles[taille].scale.split(' ');
+            objet3d.setAttribute('width', parseFloat(newScale[0]));
+            objet3d.setAttribute('height', parseFloat(newScale[1]));
+            objet3d.setAttribute('depth', parseFloat(newScale[2]));
+            
+            // Mise à jour de la position pour le centrer sur le sol
+            objet3d.setAttribute('position', `0 ${parseFloat(newScale[1]) / 2} 0`);
         }
     });
   </script>

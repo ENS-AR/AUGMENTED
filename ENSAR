@@ -40,7 +40,7 @@
 </head>
 <body>
   <div id="overlay">
-    <b>🪄 Réalité augmentée :</b> pointez la caméra vers le marqueur <b>Hiro</b>.<br>
+    <b>🪄 Réalité augmentée :</b> pointez la caméra vers le marqueur <b>3D</b>.<br>
     👉 Touchez l’écran pour changer la taille de la Terre.
   </div>
 

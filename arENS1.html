@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>RA : Objet au Clic</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <style>
+    body, html {
+      margin: 0; padding: 0;
+      height: 100%; overflow: hidden;
+      background: #000; color: #fff;
+      font-family: Arial, sans-serif;
+    }
+    #overlay {
+      position: absolute;
+      top: 8px; left: 8px;
+      background: rgba(0,0,0,0.6); /* Arrière-plan plus foncé pour l'instruction */
+      padding: 12px 15px;
+      border-radius: 8px;
+      font-size: 16px;
+      text-align: center;
+      z-index: 2;
+      width: calc(100% - 32px); /* Pleine largeur pour mobile */
+    }
+    #logo {
+      position: absolute; bottom: 10px; right: 10px; z-index: 2; width: 80px; opacity: 0.7;
+    }
+  </style>
+
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+</head>
+<body>
+  <div id="overlay">
+    <b>🪄 Réalité Augmentée :</b> Pointez la caméra vers le marqueur **Hiro**.<br>
+    👆 **TOUCHEZ l'écran** pour faire apparaître l'objet 3D !
+  </div>
+
+  <img id="logo" src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Logo_Terre.png" alt="Logo" />
+
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+    <a-entity light="type: ambient; intensity: 1.0"></a-entity>
+    <a-entity light="type: directional; intensity: 0.6" position="1 1 0.5"></a-entity>
+
+        <a-marker preset="hiro">
+            <a-entity id="terre"
+        gltf-model="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/EarthSatellite/glTF-Binary/EarthSatellite.glb"
+        scale="0.3 0.3 0.3"
+        rotation="0 0 0"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear"
+        position="0 0 0"
+        **visible="false"**>       </a-entity>
+
+            <a-plane rotation="-90 0 0" width="2" height="2" color="#111" opacity="0.2" **visible="false"** id="ombre"></a-plane>
+    </a-marker>
+
+    <a-entity camera></a-entity>
+  </a-scene>
+
+  <script>
+    const terre = document.getElementById('terre');
+    const ombre = document.getElementById('ombre');
+    const overlay = document.getElementById('overlay');
+    let isVisible = false;
+
+    window.addEventListener('click', () => {
+        // Si l'objet n'est pas encore visible (le premier clic)
+        if (!isVisible) {
+            // Rendre l'objet et l'ombre visibles
+            terre.setAttribute('visible', true);
+            ombre.setAttribute('visible', true);
+            isVisible = true;
+            
+            // Masquer l'instruction après la première apparition
+            overlay.style.display = 'none';
+
+        } else {
+            // Le code existant pour changer la taille peut être réintégré ici
+            // Ex: Changer la taille (comme dans votre script original)
+            let taille = 0;
+            const tailles = [
+                { scale: '0.3 0.3 0.3' },
+                { scale: '0.5 0.5 0.5' },
+                { scale: '0.2 0.2 0.2' }
+            ];
+
+            // Trouver la taille actuelle et passer à la suivante (simplement pour illustrer)
+            const currentScale = terre.getAttribute('scale');
+            let currentIndex = tailles.findIndex(t => t.scale === `${currentScale.x} ${currentScale.y} ${currentScale.z}`);
+            
+            taille = (currentIndex + 1) % tailles.length;
+            terre.setAttribute('scale', tailles[taille].scale);
+        }
+    });
+  </script>
+</body>
+</html>

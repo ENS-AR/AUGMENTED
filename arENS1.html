@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8" />
-  <title>RA : Affichage Instantané avec Logo</title>
+  <title>RA : Logo Fixe et Petit</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <style>
     body, html {
@@ -12,25 +12,18 @@
       font-family: Arial, sans-serif;
     }
     #overlay {
-      position: absolute;
-      top: 8px; left: 8px;
-      background: rgba(0,0,0,0.6);
-      padding: 12px 15px;
-      border-radius: 8px;
-      font-size: 16px;
-      text-align: center;
-      z-index: 2;
-      width: calc(100% - 32px);
+      position: absolute; top: 8px; left: 8px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px 15px; border-radius: 8px;
+      font-size: 14px; text-align: center; z-index: 2;
     }
-    /* Style pour positionner le logo en bas à droite (FIXE) */
+    /* Style CLE : positionnement fixe pour le logo */
     #logo {
-      position: fixed; /* Utilisation de 'fixed' pour qu'il reste visible même si on scroll (bien que non applicable ici, c'est la meilleure pratique) */
-      bottom: 10px;
-      right: 10px;
-      z-index: 2;
-      width: 80px;
+      position: fixed; /* Assure qu'il reste fixe par rapport à la fenêtre de visualisation */
+      bottom: 10px; right: 10px; 
+      z-index: 2; /* S'assure qu'il est au-dessus de la scène 3D */
+      width: 60px; /* Taille petite demandée */
       opacity: 0.8;
-      transition: opacity 0.3s;
     }
   </style>
 
@@ -39,15 +32,15 @@
 </head>
 <body>
   <div id="overlay">
-    <b>🪄 Réalité Augmentée :</b> Pointez la caméra vers le marqueur **Hiro**.<br>
-    L'objet 3D blanc s'affiche **instantanément**. Touchez pour changer sa taille.
+    <b>🪄 Réalité Augmentée :</b> Cube blanc en affichage automatique. Touchez l'écran pour le redimensionner.
   </div>
 
-    <img id="logo" src="https://upload.wikimedia.org/wikipedia/commons/4/41/Google_logo_2015.png" alt="Logo de démonstration" />
+    <img id="logo" src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Logo_Terre.png" alt="Logo" />
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-        <a-entity light="type: ambient; intensity: 1.0; color: #fff"></a-entity>
-    <a-entity light="type: directional; intensity: 0.8; color: #fff" position="1 1 0.5"></a-entity>
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;">
+    
+        <a-entity light="type: ambient; intensity: 0.8; color: #fff"></a-entity>
+    <a-entity light="type: directional; intensity: 0.7; color: #fff" position="1 1 0.5"></a-entity>
 
         <a-marker preset="hiro">
             <a-box id="objet3d"
@@ -61,35 +54,32 @@
             <a-plane rotation="-90 0 0" width="1.5" height="1.5" color="#111" opacity="0.4" id="ombre"></a-plane>
     </a-marker>
 
-    <a-entity camera></a-entity>
+        <a-entity camera></a-entity>
+
   </a-scene>
 
   <script>
     const objet3d = document.getElementById('objet3d');
     
-    // Les tailles pour le changement au clic
+    // Tailles pour le changement au clic
     const tailles = [
         { w: 0.5, h: 0.5, d: 0.5 },
         { w: 0.8, h: 0.8, d: 0.8 },
         { w: 0.3, h: 0.3, d: 0.3 }
     ];
+    let currentIndex = 0;
 
     window.addEventListener('click', () => {
-        // Logique pour changer la taille de l'objet au clic (maintenue)
-        const currentData = objet3d.components.geometry.data;
+        // Logique pour changer la taille de l'objet au clic
+        currentIndex = (currentIndex + 1) % tailles.length;
+        const nextSize = tailles[currentIndex];
         
-        let currentIndex = tailles.findIndex(t => t.w === currentData.width && t.h === currentData.height);
-        
-        // Calculer l'index suivant
-        let nextIndex = (currentIndex + 1) % tailles.length;
-        const nextSize = tailles[nextIndex];
-        
-        // Appliquer la nouvelle taille (width, height, depth)
+        // Appliquer la nouvelle taille
         objet3d.setAttribute('width', nextSize.w);
         objet3d.setAttribute('height', nextSize.h);
         objet3d.setAttribute('depth', nextSize.d);
         
-        // Mise à jour de la position verticale (pour le centrer au-dessus du sol/marqueur)
+        // Mise à jour de la position pour centrer sur le marqueur
         objet3d.setAttribute('position', `0 ${nextSize.h / 2} 0`);
     });
   </script>

@@ -1,74 +1,97 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <title>RA : Texte Automatique</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <style>
-    body, html {
-      margin: 0; padding: 0;
-      height: 100%; overflow: hidden;
-      background: #000; color: #fff;
-      font-family: Arial, sans-serif;
-    }
-    #overlay {
-      position: absolute; top: 8px; left: 8px;
-      background: rgba(0,0,0,0.7);
-      padding: 10px 15px; border-radius: 8px;
-      font-size: 14px; text-align: center; z-index: 2;
-    }
-    /* Logo fixe et petit en bas à droite */
-    #logo {
-      position: fixed; 
-      bottom: 10px; right: 10px; 
-      z-index: 2; 
-      width: 60px; 
-      opacity: 0.8;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Affichage Automatique 3D sur Monde Réel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden; /* Important pour les scènes AR plein écran */
+            font-family: Arial, sans-serif;
+            color: #fff;
+            background-color: #000;
+        }
+
+        /* Overlay d'instructions en haut à gauche */
+        #ar-overlay {
+            position: fixed; /* Reste fixe par rapport à la fenêtre */
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+            z-index: 1000; /* Assure la superposition sur la scène AR */
+        }
+
+        /* Logo fixe en bas à droite */
+        #ar-logo {
+            position: fixed; /* Reste fixe par rapport à la fenêtre */
+            bottom: 10px;
+            right: 10px;
+            width: 300px; /* Petite taille */
+            height: auto;
+            opacity: 0.8;
+            z-index: 1000; /* Assure la superposition sur la scène AR */
+            transition: opacity 0.3s ease; /* Effet de transition au survol */
+        }
+
+        #ar-logo:hover {
+            opacity: 1.0;
+        }
+    </style>
 </head>
 <body>
-  <div id="overlay">
-    <b>🪄 Réalité Augmentée :</b> Pointez la caméra vers le marqueur **Hiro**. Le message s'affiche automatiquement.
-  </div>
 
-    <img id="logo" src="LogoAR.png" alt="Logo" />
+    <div id="ar-overlay">
+        <b>💡 Réalité Augmentée :</b> Pointez la caméra vers le marqueur **Hiro**. Le cube blanc s'affiche automatiquement.
+        <br>
+        (Vérifiez l'accès à la caméra de votre navigateur.)
+    </div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;">
-    
-        <a-entity light="type: ambient; intensity: 1.0; color: #fff"></a-entity>
+    <img id="ar-logo" src="LogoAR.png" alt="Logo de l'application AR">
 
-        <a-marker preset="hiro">
-            <a-text id="arText"
-        value="TEST AR" 
-        color="#FF00FF" 
-        align="center" 
-        width="2" 
-        rotation="-90 0 0"         position="0 0.1 0">       </a-text>
+    <a-scene 
+        embedded 
+        arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; cameraParametersUrl: data/camera_para.dat;'
+        vr-mode-ui="enabled: false">
         
-    </a-marker>
+        <a-entity light="type: ambient; intensity: 0.8; color: #FFF"></a-entity>
+        <a-entity light="type: directional; intensity: 0.7; color: #FFF" position="1 1 0.5"></a-entity>
 
-        <a-entity camera></a-entity>
+        <a-marker preset="hiro">
+            <a-box 
+                id="ar-object"
+                color="#FFFFFF" 
+                depth="0.5" height="0.5" width="0.5" 
+                position="0 0.25 0" /* Positionne le cube pour qu'il "repose" sur le marqueur */
+                rotation="0 0 0"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear">
+            </a-box>
 
-  </a-scene>
+            <a-plane 
+                rotation="-90 0 0" 
+                width="1.5" height="1.5" 
+                color="#111" 
+                opacity="0.4">
+            </a-plane>
+        </a-marker>
 
-  <script>
-    // Le texte s'affiche automatiquement, aucun code JavaScript n'est nécessaire pour l'affichage.
-    // Cependant, vous pourriez ajouter de l'interactivité ou une animation ici si nécessaire.
-    
-    // Exemple d'animation : faire pulser la couleur du texte
-    const arText = document.getElementById('arText');
-    arText.setAttribute('animation__color', {
-        property: 'color',
-        from: '#FF00FF', // Magenta
-        to: '#FFFF00', // Jaune
-        dir: 'alternate',
-        loop: true,
-        dur: 1500 
-    });
-  </script>
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        // Aucun code JavaScript n'est nécessaire ici pour l'affichage automatique du logo, de l'overlay et de l'objet 3D.
+        // L'affichage est géré par le HTML/CSS et la configuration A-Frame/AR.js.
+        // Vous pouvez ajouter des interactions (clics, animations) ici si vous le souhaitez.
+    </script>
 </body>
 </html>

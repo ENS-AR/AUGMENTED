@@ -24,6 +24,34 @@
     width: 100%; height: 100%;
     z-index: 2;
   }
+  /* --- Section Précharge (Nouveau) --- */
+  #preload {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #1a1a1a; /* Couleur de fond pour le preload */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999; /* Au-dessus de tout */
+    opacity: 1;
+    transition: opacity 1s ease-out; /* Effet de fondu */
+  }
+  #preload.hidden {
+    opacity: 0;
+    pointer-events: none; /* Désactive les interactions une fois invisible */
+  }
+  #preload img {
+    max-width: 80%;
+    max-height: 80%;
+    /* Optionnel : petite animation du logo pendant le chargement */
+    animation: pulse 1.5s infinite alternate; 
+  }
+  @keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+  }
+  /* ------------------------------------ */
   #ui-logo {
     position: fixed;
     top: 10px;
@@ -49,6 +77,10 @@
 </style>
 </head>
 <body>
+  <div id="preload">
+    <img src="LogoAr.png" alt="Chargement...">
+  </div>
+
   <video id="camera" autoplay playsinline></video>
   <div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
   <div id="error"></div>
@@ -58,6 +90,15 @@
 
   const video = document.getElementById('camera');
   const errorMsg = document.getElementById('error');
+  const preload = document.getElementById('preload'); // Nouvelle référence
+
+  // --- Fonctions de gestion du chargement ---
+  function hidePreload() {
+    // S'assure que la vidéo est chargée et que Three.js est prêt
+    if (video.readyState >= 3 && book) { 
+        preload.classList.add('hidden');
+    }
+  }
 
   // === 1. Ouvrir la caméra ===
   async function startCamera() {
@@ -67,9 +108,11 @@
         audio: false
       });
       video.srcObject = stream;
+      video.addEventListener('loadeddata', hidePreload); // Cacher au chargement de la caméra
     } catch (err) {
       errorMsg.textContent = "Erreur caméra : " + err.message;
       errorMsg.style.display = "block";
+      hidePreload(); // Cacher le preload même en cas d'erreur
     }
   }
   startCamera();
@@ -81,8 +124,9 @@
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.domElement.style.zIndex = 2; // S'assurer que le canvas est au-dessus de la vidéo
   document.body.appendChild(renderer.domElement);
-
+  
   // === 3. Lumière ===
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(1, 1, 2);
@@ -124,14 +168,23 @@
   book.add(pages);
   book.add(frontCover);
   scene.add(book);
+  
+  book.rotation.x = 0.2; // Position initiale
+  book.scale.set(1, 1, 1); // Échelle initiale
+  
+  // Cacher le preload une fois l'objet 3D ajouté à la scène
+  hidePreload();
 
-  // === 5. Animation du livre ===
-  let angle = 0;
+  // === 5. Animation du livre (rotation légère automatique) ===
+  let autoAngle = 0;
   function animate() {
     requestAnimationFrame(animate);
-    angle += 0.01;
-    book.rotation.y = Math.sin(angle) * 0.5; // léger mouvement
-    book.rotation.x = 0.2;
+    // Rotation légère auto Sauf si un contrôle tactile est actif
+    if (!isControlling) {
+        autoAngle += 0.01;
+        book.rotation.y = Math.sin(autoAngle) * 0.5 + initialRotationY; 
+    }
+    
     renderer.render(scene, camera);
   }
   animate();
@@ -142,7 +195,96 @@
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
+  
+  
+  // ==========================================================
+  // === 7. Contrôles Tactiles (Zoom/Rotation avec deux doigts) (Nouveau) ===
+  // ==========================================================
+  let startDistance = 0;
+  let isControlling = false; // Indique si un mouvement tactile est en cours
+  
+  let previousTouchPosition = null;
+  let initialRotationY = 0; // Stocker la rotation de base pour la combiner avec la rotation auto
+  
+  const MIN_SCALE = 0.5;
+  const MAX_SCALE = 3.0;
+
+  function getDistance(touches) {
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function getMidPoint(touches) {
+      return {
+          x: (touches[0].pageX + touches[1].pageX) / 2,
+          y: (touches[0].pageY + touches[1].pageY) / 2
+      };
+  }
+
+  renderer.domElement.addEventListener('touchstart', (event) => {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      isControlling = true;
+      initialRotationY = book.rotation.y; // Capture la rotation actuelle
+      
+      // Zoom
+      startDistance = getDistance(event.touches);
+      
+      // Rotation
+      previousTouchPosition = getMidPoint(event.touches);
+    }
+  });
+
+  renderer.domElement.addEventListener('touchmove', (event) => {
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      
+      // --- Zoom (Pincer/Écarter) ---
+      const currentDistance = getDistance(event.touches);
+      const scaleFactor = currentDistance / startDistance;
+      let newScale = Math.min(Math.max(book.scale.x * scaleFactor, MIN_SCALE), MAX_SCALE);
+      book.scale.set(newScale, newScale, newScale);
+      
+      // Mettre à jour la distance de départ pour un mouvement continu
+      startDistance = currentDistance; 
+
+      // --- Rotation (Pivoter avec 2 doigts) ---
+      const currentTouchPosition = getMidPoint(event.touches);
+      
+      if (previousTouchPosition) {
+          // Calculer le changement horizontal (rotation Y) et vertical (rotation X)
+          const deltaX = currentTouchPosition.x - previousTouchPosition.x;
+          const deltaY = currentTouchPosition.y - previousTouchPosition.y;
+          
+          // La sensibilité peut être ajustée (diviser par un nombre plus grand pour moins de rotation)
+          const sensitivity = 0.005; 
+          
+          // Rotation autour de l'axe Y (horizontal)
+          book.rotation.y += deltaX * sensitivity;
+          
+          // Rotation autour de l'axe X (vertical)
+          book.rotation.x += deltaY * sensitivity;
+
+          // Limiter la rotation X pour éviter que le livre ne soit à l'envers
+          // book.rotation.x = Math.min(Math.max(book.rotation.x, -Math.PI / 2), Math.PI / 2);
+          
+          previousTouchPosition = currentTouchPosition; // Mettre à jour la position
+          
+          // Réinitialiser la rotation auto pour repartir de la rotation manuelle
+          autoAngle = book.rotation.y;
+          initialRotationY = 0;
+      }
+    }
+  });
+
+  renderer.domElement.addEventListener('touchend', (event) => {
+    if (event.touches.length === 0) {
+      isControlling = false;
+      startDistance = 0;
+      previousTouchPosition = null;
+    }
+  });
 </script>
 </body>
 </html>
-

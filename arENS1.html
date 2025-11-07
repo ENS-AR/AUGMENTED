@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>AR Livre interactif</title>
+<title>AR Boutons interactifs</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
     background: #000;
-    touch-action: none; /* pour les gestes tactiles */
+    touch-action: none;
+    font-family: sans-serif;
   }
 
   video {
@@ -29,8 +30,8 @@
     display: none; /* caché jusqu'au clic */
   }
 
-  /* Logo fixe en haut au milieu */
-  #ui-logo {
+  /* Logo preload en haut */
+  #logo-preload {
     position: fixed;
     top: 10px;
     left: 50%;
@@ -38,45 +39,57 @@
     transition: transform 3s ease;
     z-index: 3;
   }
-
-  #ui-logo.show {
-    transform: translateX(-50%) scale(1); /* taille finale normale */
+  #logo-preload.show {
+    transform: translateX(-50%) scale(0.7); /* taille moyenne */
+  }
+  #logo-preload img {
+    height: 50px;
+    width: auto;
   }
 
-  #ui-logo img {
-    width: 30px;
-    height: 30px; /* taille finale du logo */
-    );
-  }
-
-  #error {
+  /* Logo fixe en bas */
+  #logo-bottom {
     position: fixed;
-    bottom: 20px;
+    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0,0,0,0.7);
-    color: #fff;
+    z-index: 3;
+  }
+  #logo-bottom img {
+    height: 30px;
+    width: auto;
+  }
+
+  /* Buttons interactifs */
+  .ar-button {
+    position: absolute;
+    background: rgba(0,255,255,0.8);
+    color: #000;
     padding: 10px 20px;
-    border-radius: 10px;
-    display: none;
+    border-radius: 8px;
+    cursor: pointer;
     z-index: 4;
-    font-family: sans-serif;
+    user-select: none;
+    touch-action: none;
   }
 </style>
 </head>
 <body>
 
 <video id="camera" autoplay playsinline></video>
-<div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
+
+<!-- Logo preload en haut -->
+<div id="logo-preload"><img src="LogoAR.png" alt="Logo Preload"></div>
+
+<!-- Logo fixe en bas -->
+<div id="logo-bottom"><img src="LogoAR.png" alt="Logo Bas"></div>
+
 <div id="error"></div>
 
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-
+<script>
 const video = document.getElementById('camera');
 const errorMsg = document.getElementById('error');
-const uiLogo = document.getElementById('ui-logo');
-let renderer, scene, camera, book;
+const logoPreload = document.getElementById('logo-preload');
 
 // === 1. Caméra arrière automatique ===
 async function startCamera() {
@@ -93,107 +106,54 @@ async function startCamera() {
 }
 startCamera();
 
-// === 2. Préload du logo avec effet zoom 3 secondes ===
+// === 2. Préload logo avec zoom 3s ===
 const imgLogo = new Image();
-imgLogo.src = 'LogoAr.png';
-imgLogo.onload = () => setTimeout(() => uiLogo.classList.add('show'), 100);
+imgLogo.src = 'LogoAR.png';
+imgLogo.onload = () => setTimeout(() => logoPreload.classList.add('show'), 100);
 
-// === 3. Initialisation scène Three.js ===
-function initAR() {
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-  camera.position.z = 3;
+// === 3. Créer boutons après clic sur l’espace réel ===
+video.addEventListener('click', () => {
+  createButtons();
+});
 
-  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.domElement.style.display = 'block';
-  document.body.appendChild(renderer.domElement);
+// === 4. Fonction pour créer 3 boutons interactifs ===
+function createButtons() {
+  const links = [
+    { text: "Lien 1", url: "https://example.com/1" },
+    { text: "Lien 2", url: "https://example.com/2" },
+    { text: "Lien 3", url: "https://example.com/3" }
+  ];
 
-  // Lumières
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1,1,2);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  links.forEach((link, index) => {
+    const btn = document.createElement('div');
+    btn.className = 'ar-button';
+    btn.textContent = link.text;
+    btn.style.left = `${50 + (index-1)*100}px`; // position initial
+    btn.style.top = '50px';
+    document.body.appendChild(btn);
 
-  // Livre blanc 3D
-  const coverMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  const pageMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5 });
-  const coverWidth = 1.2, coverHeight = 0.8, coverThickness = 0.05;
+    // Cliquer ouvre le lien
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // éviter de relancer l'AR
+      window.open(link.url, "_blank");
+    });
 
-  const backCover = new THREE.Mesh(new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMat);
-  const pages = new THREE.Mesh(new THREE.BoxGeometry(coverWidth*0.98, coverHeight*0.95, coverThickness*4), pageMat);
-  pages.position.z = coverThickness*2;
-  const frontCover = new THREE.Mesh(new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMat);
-  frontCover.position.z = coverThickness*4;
-
-  book = new THREE.Group();
-  book.add(backCover, pages, frontCover);
-  scene.add(book);
-
-  // === 4. Gestes interactifs ===
-  let startX=0, startY=0, posX=0, posY=0;
-  let scale=1, rotation=0;
-  let initialDistance=0, initialScale=1, initialRotation=0, initialAngle=0;
-
-  function distance(touches){
-    const [t1,t2]=touches;
-    return Math.hypot(t2.clientX-t1.clientX, t2.clientY-t1.clientY);
-  }
-  function angle(touches){
-    const [t1,t2]=touches;
-    return Math.atan2(t2.clientY-t1.clientY, t2.clientX-t1.clientX);
-  }
-
-  document.addEventListener('touchstart', e=>{
-    if(e.touches.length===1){
-      startX = e.touches[0].clientX - posX;
-      startY = e.touches[0].clientY - posY;
-    } else if(e.touches.length===2){
-      initialDistance = distance(e.touches);
-      initialScale = scale;
-      initialRotation = rotation;
-      initialAngle = angle(e.touches);
-    }
-  });
-
-  document.addEventListener('touchmove', e=>{
-    e.preventDefault();
-    if(e.touches.length===1){
-      posX = e.touches[0].clientX - startX;
-      posY = e.touches[0].clientY - startY;
-    } else if(e.touches.length===2){
-      const newDist = distance(e.touches);
-      scale = initialScale*(newDist/initialDistance);
-      const newAngle = angle(e.touches);
-      rotation = initialRotation + (newAngle-initialAngle)*(180/Math.PI);
-    }
-    book.position.x = (posX - window.innerWidth/2)/200;
-    book.position.y = -(posY - window.innerHeight/2)/200;
-    book.scale.set(scale,scale,scale);
-    book.rotation.y = rotation * Math.PI/180;
-  });
-
-  // === 5. Animation ===
-  function animate(){
-    requestAnimationFrame(animate);
-    renderer.render(scene,camera);
-  }
-  animate();
-
-  // Resize écran
-  window.addEventListener('resize', ()=>{
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    // Drag tactile pour déplacer
+    let offsetX=0, offsetY=0;
+    btn.addEventListener('touchstart', (e)=>{
+      const touch = e.touches[0];
+      offsetX = touch.clientX - btn.offsetLeft;
+      offsetY = touch.clientY - btn.offsetTop;
+    });
+    btn.addEventListener('touchmove', (e)=>{
+      e.preventDefault();
+      const touch = e.touches[0];
+      btn.style.left = (touch.clientX - offsetX) + 'px';
+      btn.style.top = (touch.clientY - offsetY) + 'px';
+    });
   });
 }
-
-// === 6. Afficher le livre après clic sur la caméra ===
-video.addEventListener('click', () => {
-  if(!renderer) initAR();
-});
 </script>
+
 </body>
 </html>
-
-

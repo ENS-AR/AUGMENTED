@@ -55,7 +55,7 @@
   /* Buttons interactifs */
   .ar-button {
     position: absolute;
-    background: rgba(0,255,255,0.8);
+    background: rgba(0,255,255,0.85);
     color: #000;
     padding: 10px 20px;
     border-radius: 8px;
@@ -63,6 +63,8 @@
     z-index: 4;
     user-select: none;
     touch-action: none;
+    font-weight: bold;
+    text-align: center;
   }
 </style>
 </head>
@@ -75,8 +77,6 @@
 
 <!-- Logo fixe en bas -->
 <div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
-
-<div id="error"></div>
 
 <script>
 const video = document.getElementById('camera');
@@ -114,18 +114,23 @@ function createButtons() {
     { text: "Lien 3", url: "https://example.com/3" }
   ];
 
+  const middleY = window.innerHeight / 2; // position verticale milieu
+
   links.forEach((link, index) => {
     const btn = document.createElement('div');
     btn.className = 'ar-button';
     btn.textContent = link.text;
-    btn.style.left = `${50 + (index-1)*120}px`; // position initial
-    btn.style.top = '50px';
+
+    // Position horizontale espacée, verticale milieu
+    const spacing = 120; // écart entre boutons
+    btn.style.left = (window.innerWidth / 2 + (index-1)*spacing) + 'px';
+    btn.style.top = middleY + 'px';
     document.body.appendChild(btn);
 
-    // Cliquer ouvre le lien dans une fenêtre popup
+    // Cliquer ouvre le lien dans une petite popup
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); // éviter de relancer l'AR
-      window.open(link.url, "_blank", "width=600,height=400,scrollbars=yes,resizable=yes");
+      window.open(link.url, "_blank", "width=400,height=300,scrollbars=yes,resizable=yes");
     });
 
     // Drag tactile pour déplacer

@@ -29,10 +29,10 @@
     display: none; /* caché jusqu'au clic */
   }
 
-  /* Logo fixe en bas au milieu */
+  /* Logo fixe en haut au milieu */
   #ui-logo {
     position: fixed;
-    bottom: 10px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%) scale(0);
     transition: transform 3s ease;
@@ -40,13 +40,13 @@
   }
 
   #ui-logo.show {
-    transform: translateX(-50%) scale(0.5); /* petite taille finale */
+    transform: translateX(-50%) scale(1); /* taille finale normale */
   }
 
   #ui-logo img {
     width: auto;
-    height: 30px; /* petite taille */
-    filter: drop-shadow(0 0 6px rgba(0,255,255,0.6));
+    height: 50px; /* taille finale du logo */
+   
   }
 
   #error {

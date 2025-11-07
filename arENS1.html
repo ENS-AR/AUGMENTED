@@ -10,11 +10,11 @@
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
+      background: white;
       overflow: hidden;
-      background: black;
       font-family: sans-serif;
     }
 
@@ -39,7 +39,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      background-color: black;
+      background-color: white;
       z-index: 999;
     }
 
@@ -51,6 +51,11 @@
     @keyframes pulse {
       from { opacity: 0.5; transform: scale(1); }
       to { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Masquer la scène avant activation */
+    a-scene {
+      display: none;
     }
   </style>
 </head>
@@ -70,45 +75,45 @@
     vr-mode-ui="enabled: false"
     renderer="antialias: true; alpha: true">
     
-    <a-marker preset="hiro">
-      <a-entity id="cube"
-                geometry="primitive: box"
-                material="color: white; opacity: 0.9"
-                position="0 0.5 0"
-                scale="0 0 0"
-                rotation="0 45 0">
-      </a-entity>
-    </a-marker>
+    <a-entity id="cube"
+              geometry="primitive: box"
+              material="color: white; opacity: 0.9"
+              position="0 0 -2"
+              scale="0 0 0"
+              rotation="0 45 0">
+    </a-entity>
 
     <a-entity camera></a-entity>
   </a-scene>
 
   <script>
-    // Attente du préchargement
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        document.getElementById('preload').style.display = 'none';
-      }, 3000);
-    });
-
-    // Gestion du clic sur la scène pour afficher le cube
+    const preload = document.getElementById('preload');
     const scene = document.querySelector('a-scene');
     const cube = document.querySelector('#cube');
     let cubeVisible = false;
 
+    // --- Étape 1 : Préchargement pendant 4 secondes ---
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        preload.style.display = 'none';
+        scene.style.display = 'block'; // Active la scène
+      }, 4000);
+    });
+
+    // --- Étape 2 : Clic sur la scène pour afficher le cube ---
     scene.addEventListener('click', () => {
       if (!cubeVisible) {
         cubeVisible = true;
         cube.setAttribute('animation__scale', {
           property: 'scale',
           to: '1 1 1',
-          dur: 500,
+          dur: 600,
           easing: 'easeOutElastic'
         });
       }
     });
 
-    // Gestion rotation / zoom avec gestes tactiles
+    // --- Étape 3 : Rotation et zoom interactif ---
     let lastX = 0, lastY = 0, rotating = false;
     let initialDistance = 0, initialScale = 1;
 

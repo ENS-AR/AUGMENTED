@@ -112,7 +112,7 @@ startCamera();
 
 // === 2. Préload du logo en haut avec zoom 3 secondes ===
 const imgLogo = new Image();
-imgLogo.src = 'LogoAR.png';
+imgLogo.src = 'LogoAr.png';
 imgLogo.onload = () => setTimeout(() => logoPreload.classList.add('show'), 100);
 
 // === 3. Initialisation AR avec GLB ===
@@ -135,7 +135,7 @@ function initAR() {
   // === Charger modèle GLB ===
   const loader = new GLTFLoader();
   loader.load(
-    'https://example.com/ton_model.glb', // <-- mettre le lien de ton fichier GLB
+    'ready_player_me_harry_potter.glb', // <-- mettre le lien de ton fichier GLB
     function(gltf) {
       model = gltf.scene;
       model.scale.set(1,1,1);
@@ -215,3 +215,4 @@ video.addEventListener('click', () => {
 
 </body>
 </html>
+

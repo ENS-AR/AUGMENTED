@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>AR Livre + Cube interactif</title>
+<title>AR Livre blanc interactif</title>
 <style>
   html, body {
     margin: 0;
@@ -28,6 +28,7 @@
   #ui-logo {
     position: fixed;
     top: 10px;
+    right: 10px;
     z-index: 3;
     transform: scale(0);
     transition: transform 2s ease;
@@ -36,9 +37,9 @@
     transform: scale(1);
   }
   #ui-logo img {
-    height: 30px;
+    height: 50px;
     width: auto;
-   
+    filter: drop-shadow(0 0 8px rgba(0,255,255,0.6));
   }
   #error {
     position: fixed;
@@ -57,7 +58,7 @@
 </head>
 <body>
   <video id="camera" autoplay playsinline></video>
-  <div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
+  <div id="ui-logo"><img src="LogoAR.png" alt="Logo"></div>
   <div id="error"></div>
 
 <script type="module">
@@ -67,7 +68,7 @@ const video = document.getElementById('camera');
 const errorMsg = document.getElementById('error');
 const uiLogo = document.getElementById('ui-logo');
 
-// === 1. Ouvrir la caméra ===
+// === 1. Caméra arrière automatique ===
 async function startCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -85,7 +86,7 @@ startCamera();
 // === 2. Préloader logo avec effet zoom ===
 setTimeout(() => uiLogo.classList.add('show'), 100);
 
-// === 3. Créer scène Three.js ===
+// === 3. Scène Three.js ===
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
 camera.position.z = 3;
@@ -100,30 +101,29 @@ light.position.set(1,1,2);
 scene.add(light);
 scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-// === 4. Livre 3D ===
-const coverMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-const pageMat = new THREE.MeshStandardMaterial({ color: 0xfdf6e3 });
+// === 4. Livre 3D blanc ===
+const coverMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+const pageMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5 });
 
 const coverWidth = 1.2, coverHeight = 0.8, coverThickness = 0.05;
 
+// Couverture arrière
 const backCover = new THREE.Mesh(new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMat);
+
+// Pages
 const pages = new THREE.Mesh(new THREE.BoxGeometry(coverWidth*0.98, coverHeight*0.95, coverThickness*4), pageMat);
 pages.position.z = coverThickness*2;
+
+// Couverture avant
 const frontCover = new THREE.Mesh(new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMat);
 frontCover.position.z = coverThickness*4;
 
+// Groupe livre
 const book = new THREE.Group();
 book.add(backCover, pages, frontCover);
 scene.add(book);
 
-// === 5. Cube 3D ===
-const cubeGeom = new THREE.BoxGeometry(0.5,0.5,0.5);
-const cubeMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
-const cube = new THREE.Mesh(cubeGeom, cubeMat);
-cube.position.set(1,0,0);
-scene.add(cube);
-
-// === 6. Gestes interactifs ===
+// === 5. Gestes interactifs ===
 let startX=0, startY=0, posX=0, posY=0;
 let scale = 1, rotation = 0;
 let initialDistance=0, initialScale=1, initialRotation=0, initialAngle=0;
@@ -167,17 +167,14 @@ document.addEventListener('touchmove', e=>{
   book.rotation.y = rotation * Math.PI/180;
 });
 
-// === 7. Animation ===
-let angleAnim=0;
+// === 6. Animation ===
 function animate(){
   requestAnimationFrame(animate);
-  cube.rotation.x += 0.01;
-  cube.rotation.y += 0.01;
   renderer.render(scene,camera);
 }
 animate();
 
-// === 8. Resize écran ===
+// === 7. Resize écran ===
 window.addEventListener('resize', ()=>{
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
@@ -186,6 +183,3 @@ window.addEventListener('resize', ()=>{
 </script>
 </body>
 </html>
-
-
-

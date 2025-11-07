@@ -1,204 +1,156 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cube 3D sur espace réel</title>
+  <meta charset="UTF-8">
+  <title>AR Cube - Réalité augmentée</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- A-Frame + AR.js -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+
   <style>
-    html, body {
+    body, html {
       margin: 0;
-      height: 100%;
+      padding: 0;
       overflow: hidden;
-      background: #000;
+      background: black;
+      font-family: sans-serif;
     }
 
-    /* === Vidéo (caméra du monde réel) === */
-    video {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      object-fit: cover;
-      z-index: 1;
-      display: none; /* cachée pendant le preload */
-    }
-
-    /* === Canvas Three.js === */
-    canvas {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: 2;
-      display: none; /* caché pendant le preload */
-    }
-
-    /* === Préchargement === */
-    #preload {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: #1a1a1a; 
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-      opacity: 1;
-      transition: opacity 1s ease-out;
-    }
-
-    #preload.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #preload img {
-      height: 150px; 
-      width: 150px;
-      object-fit: contain;
-      animation: cinematic-zoom 3s forwards, pulse 1.5s infinite alternate; 
-    }
-
-    @keyframes cinematic-zoom {
-      from { transform: scale(1); }
-      to { transform: scale(1.5); }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.8; }
-      50% { opacity: 1; }
-    }
-
-    /* === Logo fixe en haut au centre === */
-    #ui-logo {
+    /* Logo fixe en haut-centre */
+    #logo {
       position: fixed;
       top: 10px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 3;
+      width: 150px;
+      z-index: 10;
+      pointer-events: none;
     }
 
-    #ui-logo img {
-      height: 25px;
-    }
-
-    /* === Message d’erreur === */
-    #error {
+    /* Écran de préchargement */
+    #preload {
       position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 10px;
-      display: none;
-      z-index: 4;
-      font-family: sans-serif;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: black;
+      z-index: 999;
+    }
+
+    #preload img {
+      width: 150px;
+      animation: pulse 1s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.5; transform: scale(1); }
+      to { opacity: 1; transform: scale(1.1); }
     }
   </style>
 </head>
 <body>
-  <!-- Écran de préchargement -->
+  <!-- Préchargement -->
   <div id="preload">
-    <img src="LogoAr.png" alt="Logo">
+    <img src="LogoAr.png" alt="Chargement...">
   </div>
 
-  <!-- Flux caméra -->
-  <video id="camera" autoplay playsinline></video>
-
   <!-- Logo fixe -->
-  <div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
+  <img id="logo" src="LogoAr.png" alt="Logo">
 
-  <!-- Message d’erreur -->
-  <div id="error"></div>
+  <!-- Scène A-Frame AR -->
+  <a-scene
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+    vr-mode-ui="enabled: false"
+    renderer="antialias: true; alpha: true">
+    
+    <a-marker preset="hiro">
+      <a-entity id="cube"
+                geometry="primitive: box"
+                material="color: white; opacity: 0.9"
+                position="0 0.5 0"
+                scale="0 0 0"
+                rotation="0 45 0">
+      </a-entity>
+    </a-marker>
 
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    <a-entity camera></a-entity>
+  </a-scene>
 
-    const video = document.getElementById('camera');
-    const errorMsg = document.getElementById('error');
-    const preloadDiv = document.getElementById('preload');
-
-    // === 1. Initialisation de la scène Three.js ===
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-    camera.position.set(0, 0, 3);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    // === 2. Lumières ===
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 2);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-    // === 3. Préparation du cube (mais NE PAS encore l’ajouter) ===
-    const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-
-    let cubeAdded = false; // Flag : pour éviter de recréer le cube plusieurs fois
-
-    // === 4. Contrôles tactiles ===
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableZoom = true;
-    controls.enableRotate = true;
-    controls.enablePan = true;
-
-    // === 5. Animation de la scène ===
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-
-    // === 6. Gestion du redimensionnement ===
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // === 7. Démarrage de la caméra ===
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false
-        });
-        video.srcObject = stream;
-      } catch (err) {
-        errorMsg.textContent = "Erreur caméra : " + err.message;
-        errorMsg.style.display = "block";
-      }
-    }
-
-    // === 8. Lancement après le preload ===
-    window.onload = () => {
-      // Préload visible pendant 3 secondes
+  <script>
+    // Attente du préchargement
+    window.addEventListener('load', () => {
       setTimeout(() => {
-        preloadDiv.classList.add('hidden'); // fade out
-        setTimeout(() => {
-          preloadDiv.style.display = "none"; // supprime l’overlay après le fondu
-          // Active la caméra et affiche la scène
-          startCamera();
-          video.style.display = "block";
-          renderer.domElement.style.display = "block";
-          animate();
-        }, 1000); // délai du fondu
-      }, 3000); // durée du preload
-    };
+        document.getElementById('preload').style.display = 'none';
+      }, 3000);
+    });
 
-    // === 9. Ajouter l'objet 3D au clic sur l'écran ===
-    document.body.addEventListener('click', (event) => {
-      if (!cubeAdded) {
-        // On positionne le cube au centre
-        cube.position.set(0, 0, 0);
-        scene.add(cube);
-        cubeAdded = true;
+    // Gestion du clic sur la scène pour afficher le cube
+    const scene = document.querySelector('a-scene');
+    const cube = document.querySelector('#cube');
+    let cubeVisible = false;
+
+    scene.addEventListener('click', () => {
+      if (!cubeVisible) {
+        cubeVisible = true;
+        cube.setAttribute('animation__scale', {
+          property: 'scale',
+          to: '1 1 1',
+          dur: 500,
+          easing: 'easeOutElastic'
+        });
       }
     });
+
+    // Gestion rotation / zoom avec gestes tactiles
+    let lastX = 0, lastY = 0, rotating = false;
+    let initialDistance = 0, initialScale = 1;
+
+    scene.addEventListener('touchstart', e => {
+      if (e.touches.length === 1) {
+        rotating = true;
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        initialDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const scale = cube.getAttribute('scale');
+        initialScale = scale.x;
+      }
+    });
+
+    scene.addEventListener('touchmove', e => {
+      if (e.touches.length === 1 && rotating && cubeVisible) {
+        const dx = e.touches[0].clientX - lastX;
+        const dy = e.touches[0].clientY - lastY;
+        const rot = cube.getAttribute('rotation');
+        cube.setAttribute('rotation', {
+          x: rot.x + dy * 0.5,
+          y: rot.y + dx * 0.5,
+          z: rot.z
+        });
+        lastX = e.touches[0].clientX;
+        lastY = e.touches[0].clientY;
+      } else if (e.touches.length === 2 && cubeVisible) {
+        const newDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const scaleFactor = newDist / initialDistance;
+        const newScale = Math.min(Math.max(initialScale * scaleFactor, 0.2), 3);
+        cube.setAttribute('scale', `${newScale} ${newScale} ${newScale}`);
+      }
+    });
+
+    scene.addEventListener('touchend', () => rotating = false);
   </script>
 </body>
 </html>

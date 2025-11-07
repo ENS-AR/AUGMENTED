@@ -2,14 +2,15 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Livre 3D sur espace réel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AR Livre + Cube interactif</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
     background: #000;
+    touch-action: none; /* important pour les gestes tactiles */
   }
   video {
     position: fixed;
@@ -27,10 +28,17 @@
   #ui-logo {
     position: fixed;
     top: 10px;
+    right: 10px;
     z-index: 3;
+    transform: scale(0);
+    transition: transform 2s ease;
+  }
+  #ui-logo.show {
+    transform: scale(1);
   }
   #ui-logo img {
-    height: 30px;
+    height: 50px;
+    width: auto;
     filter: drop-shadow(0 0 8px rgba(0,255,255,0.6));
   }
   #error {
@@ -50,99 +58,132 @@
 </head>
 <body>
   <video id="camera" autoplay playsinline></video>
-  <div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
+  <div id="ui-logo"><img src="LogoAR.png" alt="Logo"></div>
   <div id="error"></div>
 
 <script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-  const video = document.getElementById('camera');
-  const errorMsg = document.getElementById('error');
+const video = document.getElementById('camera');
+const errorMsg = document.getElementById('error');
+const uiLogo = document.getElementById('ui-logo');
 
-  // === 1. Ouvrir la caméra ===
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      });
-      video.srcObject = stream;
-    } catch (err) {
-      errorMsg.textContent = "Erreur caméra : " + err.message;
-      errorMsg.style.display = "block";
-    }
+// === 1. Ouvrir la caméra ===
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    errorMsg.textContent = "Erreur caméra : " + err.message;
+    errorMsg.style.display = "block";
   }
-  startCamera();
+}
+startCamera();
 
-  // === 2. Créer la scène Three.js ===
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-  camera.position.z = 2;
+// === 2. Préloader logo avec effet zoom ===
+setTimeout(() => uiLogo.classList.add('show'), 100);
 
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+// === 3. Créer scène Three.js ===
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
+camera.position.z = 3;
+
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Lumières
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(1,1,2);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+// === 4. Livre 3D ===
+const coverMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+const pageMat = new THREE.MeshStandardMaterial({ color: 0xfdf6e3 });
+
+const coverWidth = 1.2, coverHeight = 0.8, coverThickness = 0.05;
+
+const backCover = new THREE.Mesh(new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMat);
+const pages = new THREE.Mesh(new THREE.BoxGeometry(coverWidth*0.98, coverHeight*0.95, coverThickness*4), pageMat);
+pages.position.z = coverThickness*2;
+const frontCover = new THREE.Mesh(new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMat);
+frontCover.position.z = coverThickness*4;
+
+const book = new THREE.Group();
+book.add(backCover, pages, frontCover);
+scene.add(book);
+
+// === 5. Cube 3D ===
+const cubeGeom = new THREE.BoxGeometry(0.5,0.5,0.5);
+const cubeMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+const cube = new THREE.Mesh(cubeGeom, cubeMat);
+cube.position.set(1,0,0);
+scene.add(cube);
+
+// === 6. Gestes interactifs ===
+let startX=0, startY=0, posX=0, posY=0;
+let scale = 1, rotation = 0;
+let initialDistance=0, initialScale=1, initialRotation=0, initialAngle=0;
+
+function distance(touches){
+  const [t1,t2]=touches;
+  return Math.hypot(t2.clientX-t1.clientX, t2.clientY-t1.clientY);
+}
+function angle(touches){
+  const [t1,t2]=touches;
+  return Math.atan2(t2.clientY-t1.clientY, t2.clientX-t1.clientX);
+}
+
+document.addEventListener('touchstart', e=>{
+  if(e.touches.length===1){
+    startX = e.touches[0].clientX - posX;
+    startY = e.touches[0].clientY - posY;
+  } else if(e.touches.length===2){
+    initialDistance = distance(e.touches);
+    initialScale = scale;
+    initialRotation = rotation;
+    initialAngle = angle(e.touches);
+  }
+});
+
+document.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    posX = e.touches[0].clientX - startX;
+    posY = e.touches[0].clientY - startY;
+  } else if(e.touches.length===2){
+    const newDist = distance(e.touches);
+    scale = initialScale*(newDist/initialDistance);
+    const newAngle = angle(e.touches);
+    rotation = initialRotation + (newAngle-initialAngle)*(180/Math.PI);
+  }
+
+  book.position.x = (posX - window.innerWidth/2)/200;
+  book.position.y = -(posY - window.innerHeight/2)/200;
+  book.scale.set(scale,scale,scale);
+  book.rotation.y = rotation * Math.PI/180;
+});
+
+// === 7. Animation ===
+let angleAnim=0;
+function animate(){
+  requestAnimationFrame(animate);
+  cube.rotation.x += 0.01;
+  cube.rotation.y += 0.01;
+  renderer.render(scene,camera);
+}
+animate();
+
+// === 8. Resize écran ===
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // === 3. Lumière ===
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1, 1, 2);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-  // === 4. Créer un livre 3D (2 couvertures + pages) ===
-  const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-  const pageMaterial = new THREE.MeshStandardMaterial({ color: 0xfdf6e3 });
-
-  const coverThickness = 0.05;
-  const coverWidth = 1.2;
-  const coverHeight = 0.8;
-
-  // Couverture arrière
-  const backCover = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness),
-    coverMaterial
-  );
-  backCover.position.z = 0;
-
-  // Pages
-  const pages = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth * 0.98, coverHeight * 0.95, coverThickness * 4),
-    pageMaterial
-  );
-  pages.position.z = coverThickness * 2;
-
-  // Couverture avant
-  const frontCover = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness),
-    coverMaterial
-  );
-  frontCover.position.z = coverThickness * 4;
-
-  // Groupe "livre"
-  const book = new THREE.Group();
-  book.add(backCover);
-  book.add(pages);
-  book.add(frontCover);
-  scene.add(book);
-
-  // === 5. Animation du livre ===
-  let angle = 0;
-  function animate() {
-    requestAnimationFrame(animate);
-    angle += 0.01;
-    book.rotation.y = Math.sin(angle) * 0.5; // léger mouvement
-    book.rotation.x = 0.2;
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  // === 6. Ajuster la taille de l’écran ===
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+});
 </script>
 </body>
 </html>
-

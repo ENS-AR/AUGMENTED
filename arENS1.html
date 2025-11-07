@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Objet 3D avec contrôles tactiles</title>
+  <title>Cube 3D sur espace réel</title>
   <style>
     html, body {
       margin: 0;
@@ -12,21 +12,26 @@
       background: #000;
     }
 
+    /* === Vidéo (caméra du monde réel) === */
     video {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
       object-fit: cover;
       z-index: 1;
+      display: none; /* cachée pendant le preload */
     }
 
+    /* === Canvas Three.js === */
     canvas {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
       z-index: 2;
+      display: none; /* caché pendant le preload */
     }
 
+    /* === Préchargement === */
     #preload {
       position: fixed;
       top: 0; left: 0;
@@ -62,6 +67,7 @@
       50% { opacity: 1; }
     }
 
+    /* === Logo fixe en haut au centre === */
     #ui-logo {
       position: fixed;
       top: 10px;
@@ -74,6 +80,7 @@
       height: 25px;
     }
 
+    /* === Message d’erreur === */
     #error {
       position: fixed;
       bottom: 20px;
@@ -90,88 +97,97 @@
   </style>
 </head>
 <body>
-  <!-- Préchargement avec logo -->
+  <!-- Écran de préchargement -->
   <div id="preload">
     <img src="LogoAr.png" alt="Logo">
   </div>
 
+  <!-- Flux caméra -->
   <video id="camera" autoplay playsinline></video>
+
+  <!-- Logo fixe -->
   <div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
+
+  <!-- Message d’erreur -->
   <div id="error"></div>
 
-<script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js';
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-  const video = document.getElementById('camera');
-  const errorMsg = document.getElementById('error');
-  const preloadDiv = document.getElementById('preload');
+    const video = document.getElementById('camera');
+    const errorMsg = document.getElementById('error');
+    const preloadDiv = document.getElementById('preload');
 
-  // === 1. Ouvrir la caméra ===
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      });
-      video.srcObject = stream;
-    } catch (err) {
-      errorMsg.textContent = "Erreur caméra : " + err.message;
-      errorMsg.style.display = "block";
-    }
-  }
-  startCamera();
+    // === 1. Initialisation de la scène Three.js ===
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+    camera.position.set(0, 0, 3);
 
-  // === 2. Créer la scène Three.js ===
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
-  camera.position.set(0, 0, 3); // Initialiser la caméra pour qu'elle soit un peu éloignée de l'objet
-
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // === 3. Lumière ===
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1, 1, 2);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-  // === 4. Créer un cube 3D ===
-  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-  cube.position.set(0, 0, 0); // Positionner le cube au centre
-  scene.add(cube);
-
-  // === 5. Animation du cube ===
-  function animate() {
-    requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  // === 6. Contrôles tactiles pour déplacer et zoomer ===
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableZoom = true;
-  controls.enableRotate = true;
-  controls.enablePan = true;
-
-  // === 7. Ajuster la taille de l’écran ===
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    document.body.appendChild(renderer.domElement);
 
-  // === 8. Préchargement et affichage de l'objet ===
-  window.onload = () => {
-    // Masquer l'écran de préchargement après 3 secondes
-    setTimeout(() => {
-      preloadDiv.classList.add('hidden');
-    }, 3000); // Attendre 3 secondes avant de cacher le préchargement
-  };
+    // === 2. Lumières ===
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 2);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-</script>
+    // === 3. Création du cube blanc ===
+    const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+    scene.add(cube);
+
+    // === 4. Contrôles tactiles ===
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = true;
+    controls.enableRotate = true;
+    controls.enablePan = true;
+
+    // === 5. Animation de la scène ===
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    // === 6. Gestion du redimensionnement ===
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // === 7. Démarrage de la caméra ===
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        errorMsg.textContent = "Erreur caméra : " + err.message;
+        errorMsg.style.display = "block";
+      }
+    }
+
+    // === 8. Lancement après le preload ===
+    window.onload = () => {
+      // Préload visible pendant 3 secondes
+      setTimeout(() => {
+        preloadDiv.classList.add('hidden'); // fade out
+        setTimeout(() => {
+          preloadDiv.style.display = "none"; // supprime l’overlay après le fondu
+          // Active la caméra et affiche la scène
+          startCamera();
+          video.style.display = "block";
+          renderer.domElement.style.display = "block";
+          animate();
+        }, 1000); // délai du fondu
+      }, 3000); // durée du preload
+    };
+  </script>
 </body>
 </html>

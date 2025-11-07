@@ -22,14 +22,6 @@
     z-index: 1;
   }
 
-  canvas {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 2;
-    display: none; /* caché jusqu'au clic */
-  }
-
   /* Logo preload en haut */
   #logo-preload {
     position: fixed;
@@ -88,7 +80,6 @@
 
 <script>
 const video = document.getElementById('camera');
-const errorMsg = document.getElementById('error');
 const logoPreload = document.getElementById('logo-preload');
 
 // === 1. Caméra arrière automatique ===
@@ -100,8 +91,7 @@ async function startCamera() {
     });
     video.srcObject = stream;
   } catch (err) {
-    errorMsg.textContent = "Erreur caméra : " + err.message;
-    errorMsg.style.display = "block";
+    console.error("Erreur caméra :", err);
   }
 }
 startCamera();
@@ -128,14 +118,14 @@ function createButtons() {
     const btn = document.createElement('div');
     btn.className = 'ar-button';
     btn.textContent = link.text;
-    btn.style.left = `${50 + (index-1)*100}px`; // position initial
+    btn.style.left = `${50 + (index-1)*120}px`; // position initial
     btn.style.top = '50px';
     document.body.appendChild(btn);
 
-    // Cliquer ouvre le lien
+    // Cliquer ouvre le lien dans une fenêtre popup
     btn.addEventListener('click', (e) => {
       e.stopPropagation(); // éviter de relancer l'AR
-      window.open(link.url, "_blank");
+      window.open(link.url, "_blank", "width=600,height=400,scrollbars=yes,resizable=yes");
     });
 
     // Drag tactile pour déplacer
@@ -157,4 +147,3 @@ function createButtons() {
 
 </body>
 </html>
-

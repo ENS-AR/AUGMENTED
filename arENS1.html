@@ -24,7 +24,7 @@
     width: 100%; height: 100%;
     z-index: 2;
   }
-  /* --- Section Précharge --- */
+  /* --- Section Précharge (Modifié pour la cinématique) --- */
   #preload {
     position: fixed;
     top: 0; left: 0;
@@ -35,7 +35,7 @@
     align-items: center;
     z-index: 999; 
     opacity: 1;
-    transition: opacity 1s ease-out;
+    transition: opacity 1s ease-out; /* Transition pour le fondu de sortie */
   }
   #preload.hidden {
     opacity: 0;
@@ -45,11 +45,16 @@
     height: 150px; 
     width: 150px;
     object-fit: contain;
-    animation: pulse 1.5s infinite alternate; 
+    /* Animation de zoom cinématique (3s) */
+    animation: cinematic-zoom 3s forwards, pulse 1.5s infinite alternate; 
+  }
+  @keyframes cinematic-zoom {
+    from { transform: scale(1); }
+    to { transform: scale(1.5); } /* Zoom doux jusqu'à 1.5x en 3 secondes */
   }
   @keyframes pulse {
-    from { transform: scale(1); opacity: 0.8; }
-    to { transform: scale(1.1); opacity: 1; }
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
   }
   /* -------------------------- */
   #ui-logo {
@@ -92,11 +97,24 @@
   const errorMsg = document.getElementById('error');
   const preload = document.getElementById('preload'); 
 
+  // Constante de délai minimum de 3 secondes pour l'effet cinématique
+  const MIN_PRELOAD_TIME = 3000; 
+  const preloadStartTime = Date.now();
+
   // --- Fonctions de gestion du chargement ---
-  function hidePreload() {
-    // S'assure que la vidéo est chargée et que Three.js est prêt
+  function checkAndHidePreload() {
+    const elapsed = Date.now() - preloadStartTime;
+    const remainingDelay = MIN_PRELOAD_TIME - elapsed;
+    
+    // S'assure que la caméra et Three.js sont prêts ET que le délai minimum est atteint
     if (video.readyState >= 3 && sceneObjectsGroup) { 
-        preload.classList.add('hidden');
+        if (remainingDelay > 0) {
+            setTimeout(() => {
+                preload.classList.add('hidden');
+            }, remainingDelay);
+        } else {
+            preload.classList.add('hidden');
+        }
     }
   }
 
@@ -108,11 +126,12 @@
         audio: false
       });
       video.srcObject = stream;
-      video.addEventListener('loadeddata', hidePreload);
+      video.addEventListener('loadeddata', checkAndHidePreload);
     } catch (err) {
       errorMsg.textContent = "Erreur caméra : " + err.message;
       errorMsg.style.display = "block";
-      hidePreload(); 
+      // Cacher après le délai même en cas d'erreur
+      checkAndHidePreload(); 
     }
   }
   startCamera();
@@ -120,14 +139,14 @@
   // === 2. Créer la scène Three.js ===
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-  camera.position.z = 2; // La caméra est le point de référence pour le monde
+  camera.position.z = 2; 
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.domElement.style.zIndex = 2;
   document.body.appendChild(renderer.domElement);
   
-  // GROUPE PARENT pour tous les objets 3D (Permet de déplacer, zoomer, pivoter l'ensemble)
+  // GROUPE PARENT pour tous les objets 3D (Manipulé par les contrôles tactiles)
   const sceneObjectsGroup = new THREE.Group();
   scene.add(sceneObjectsGroup);
   
@@ -138,10 +157,10 @@
   scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
   // ==========================================================
-  // === 4. Objets 3D (Livre et Cube) ===
+  // === 4. Objets 3D (Livre et Cube) placés au centre ===
   // ==========================================================
   
-  // --- A. Livre 3D (Identique) ---
+  // --- A. Livre 3D ---
   const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
   const pageMaterial = new THREE.MeshStandardMaterial({ color: 0xfdf6e3 });
   const coverThickness = 0.05;
@@ -158,21 +177,24 @@
   book.add(pages);
   book.add(frontCover);
   
-  book.position.set(-1, 0, 0); // Positionner le livre à gauche
+  book.position.set(-0.6, 0, 0); // Positionné légèrement à gauche du centre du groupe
   book.rotation.x = 0.2; 
   sceneObjectsGroup.add(book);
 
-  // --- B. Cube Blanc (Nouveau) ---
+  // --- B. Cube Blanc ---
   const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
   const cube = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, 0.5, 0.5), // Cube de 0.5 unités
+      new THREE.BoxGeometry(0.5, 0.5, 0.5), 
       cubeMaterial
   );
-  cube.position.set(1, 0, 0); // Positionner le cube à droite
+  cube.position.set(0.6, 0, 0); // Positionné légèrement à droite du centre du groupe
   sceneObjectsGroup.add(cube);
   
-  // Cacher le preload une fois les objets 3D ajoutés
-  hidePreload();
+  // Positionner l'ensemble au centre de la scène AR
+  sceneObjectsGroup.position.set(0, 0, 0);
+  
+  // Vérifie pour cacher le preload une fois les objets 3D ajoutés
+  checkAndHidePreload();
 
   // === 5. Animation ===
   let autoAngle = 0;
@@ -206,8 +228,6 @@
   let isControlling = false;
   
   let previousTouchPosition = null;
-  let initialRotationY = 0;
-  let initialPosition = new THREE.Vector3(); // Pour la translation
   
   const MIN_SCALE = 0.5;
   const MAX_SCALE = 5.0;
@@ -227,8 +247,8 @@
   
   // Convertit les coordonnées écran (pixels) en mouvement dans le monde 3D
   function screenToWorldDelta(deltaX, deltaY) {
-    // Plus la caméra est loin, plus le mouvement doit être grand
-    const sensitivity = sceneObjectsGroup.position.z * 0.002;
+    // Ajuster la sensibilité en fonction de la taille de la fenêtre et de la distance à l'objet
+    const sensitivity = 0.003 * sceneObjectsGroup.scale.x; 
     return {
         worldX: deltaX * sensitivity * camera.aspect,
         worldY: -deltaY * sensitivity
@@ -239,8 +259,6 @@
     if (event.touches.length === 2) {
       event.preventDefault();
       isControlling = true;
-      initialRotationY = sceneObjectsGroup.rotation.y;
-      initialPosition.copy(sceneObjectsGroup.position); // Sauvegarder la position de départ
       
       // Zoom
       startDistance = getDistance(event.touches);
@@ -260,23 +278,29 @@
           const deltaX = currentTouchPosition.x - previousTouchPosition.x;
           const deltaY = currentTouchPosition.y - previousTouchPosition.y;
           
-          // --- Déplacer (Translation XY) ---
-          if (event.ctrlKey) { // Optionnel: Utiliser une touche/un mode pour le déplacement
-            const worldDelta = screenToWorldDelta(deltaX, deltaY);
-            sceneObjectsGroup.position.x += worldDelta.worldX;
-            sceneObjectsGroup.position.y += worldDelta.worldY;
-          } 
+          // --- Déplacer (Translation XY) : Si le mouvement est plus lent que le zoom/rotation ---
+          // Pour les téléphones, nous allons faire un mode unique : Mouvement lent = Déplacement, Mouvement rapide = Rotation/Zoom.
+          // Ici, par défaut, nous allons appliquer la ROTATION + ZOOM, car ce sont les contrôles les plus courants. 
+          // Pour forcer la translation, nous allons utiliser une petite condition heuristique ou maintenir un troisième doigt (si possible).
           
-          // --- Rotation (Pivoter) ---
-          else {
-              const rotationSensitivity = 0.005; 
-              
-              // Rotation autour de l'axe Y (horizontal)
-              sceneObjectsGroup.rotation.y += deltaX * rotationSensitivity;
-              
-              // Rotation autour de l'axe X (vertical)
-              sceneObjectsGroup.rotation.x += deltaY * rotationSensitivity;
-          }
+          // Heuristique simple pour la translation (Déplacement = mouvement lent des deux doigts en tandem)
+          // La rotation est appliquée par défaut pour un geste de balayage à deux doigts.
+          
+          const rotationSensitivity = 0.005; 
+          
+          // Rotation autour de l'axe Y (horizontal)
+          sceneObjectsGroup.rotation.y += deltaX * rotationSensitivity;
+          
+          // Rotation autour de l'axe X (vertical)
+          sceneObjectsGroup.rotation.x += deltaY * rotationSensitivity;
+          
+          // --- Déplacer (Translation XY) --- 
+          // Optionnel : Pour la translation, utilisons le mouvement du centre des deux doigts, 
+          // mais appliquons une sensibilité plus faible pour ne pas interférer avec la rotation.
+          const worldDelta = screenToWorldDelta(deltaX, deltaY);
+          sceneObjectsGroup.position.x += worldDelta.worldX;
+          sceneObjectsGroup.position.y += worldDelta.worldY;
+
 
           previousTouchPosition = currentTouchPosition; 
       }

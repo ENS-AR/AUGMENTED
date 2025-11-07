@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Livre 3D sur espace réel</title>
+<title>Livre et Cube 3D sur espace réel</title>
 <style>
   html, body {
     margin: 0;
@@ -24,34 +24,34 @@
     width: 100%; height: 100%;
     z-index: 2;
   }
-  /* --- Section Précharge (Nouveau) --- */
+  /* --- Section Précharge --- */
   #preload {
     position: fixed;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    background: #1a1a1a; /* Couleur de fond pour le preload */
+    background: #1a1a1a; 
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 999; /* Au-dessus de tout */
+    z-index: 999; 
     opacity: 1;
-    transition: opacity 1s ease-out; /* Effet de fondu */
+    transition: opacity 1s ease-out;
   }
   #preload.hidden {
     opacity: 0;
-    pointer-events: none; /* Désactive les interactions une fois invisible */
+    pointer-events: none;
   }
   #preload img {
-    max-width: 80%;
-    max-height: 80%;
-    /* Optionnel : petite animation du logo pendant le chargement */
+    height: 150px; 
+    width: 150px;
+    object-fit: contain;
     animation: pulse 1.5s infinite alternate; 
   }
   @keyframes pulse {
-    from { transform: scale(1); }
-    to { transform: scale(1.05); }
+    from { transform: scale(1); opacity: 0.8; }
+    to { transform: scale(1.1); opacity: 1; }
   }
-  /* ------------------------------------ */
+  /* -------------------------- */
   #ui-logo {
     position: fixed;
     top: 10px;
@@ -90,12 +90,12 @@
 
   const video = document.getElementById('camera');
   const errorMsg = document.getElementById('error');
-  const preload = document.getElementById('preload'); // Nouvelle référence
+  const preload = document.getElementById('preload'); 
 
   // --- Fonctions de gestion du chargement ---
   function hidePreload() {
     // S'assure que la vidéo est chargée et que Three.js est prêt
-    if (video.readyState >= 3 && book) { 
+    if (video.readyState >= 3 && sceneObjectsGroup) { 
         preload.classList.add('hidden');
     }
   }
@@ -108,11 +108,11 @@
         audio: false
       });
       video.srcObject = stream;
-      video.addEventListener('loadeddata', hidePreload); // Cacher au chargement de la caméra
+      video.addEventListener('loadeddata', hidePreload);
     } catch (err) {
       errorMsg.textContent = "Erreur caméra : " + err.message;
       errorMsg.style.display = "block";
-      hidePreload(); // Cacher le preload même en cas d'erreur
+      hidePreload(); 
     }
   }
   startCamera();
@@ -120,12 +120,16 @@
   // === 2. Créer la scène Three.js ===
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-  camera.position.z = 2;
+  camera.position.z = 2; // La caméra est le point de référence pour le monde
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.domElement.style.zIndex = 2; // S'assurer que le canvas est au-dessus de la vidéo
+  renderer.domElement.style.zIndex = 2;
   document.body.appendChild(renderer.domElement);
+  
+  // GROUPE PARENT pour tous les objets 3D (Permet de déplacer, zoomer, pivoter l'ensemble)
+  const sceneObjectsGroup = new THREE.Group();
+  scene.add(sceneObjectsGroup);
   
   // === 3. Lumière ===
   const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -133,56 +137,54 @@
   scene.add(light);
   scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-  // === 4. Créer un livre 3D (2 couvertures + pages) ===
+  // ==========================================================
+  // === 4. Objets 3D (Livre et Cube) ===
+  // ==========================================================
+  
+  // --- A. Livre 3D (Identique) ---
   const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
   const pageMaterial = new THREE.MeshStandardMaterial({ color: 0xfdf6e3 });
-
   const coverThickness = 0.05;
   const coverWidth = 1.2;
   const coverHeight = 0.8;
-
-  // Couverture arrière
-  const backCover = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness),
-    coverMaterial
-  );
-  backCover.position.z = 0;
-
-  // Pages
-  const pages = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth * 0.98, coverHeight * 0.95, coverThickness * 4),
-    pageMaterial
-  );
+  const backCover = new THREE.Mesh( new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMaterial );
+  const pages = new THREE.Mesh( new THREE.BoxGeometry(coverWidth * 0.98, coverHeight * 0.95, coverThickness * 4), pageMaterial );
   pages.position.z = coverThickness * 2;
-
-  // Couverture avant
-  const frontCover = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness),
-    coverMaterial
-  );
+  const frontCover = new THREE.Mesh( new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness), coverMaterial );
   frontCover.position.z = coverThickness * 4;
-
-  // Groupe "livre"
+  
   const book = new THREE.Group();
   book.add(backCover);
   book.add(pages);
   book.add(frontCover);
-  scene.add(book);
   
-  book.rotation.x = 0.2; // Position initiale
-  book.scale.set(1, 1, 1); // Échelle initiale
+  book.position.set(-1, 0, 0); // Positionner le livre à gauche
+  book.rotation.x = 0.2; 
+  sceneObjectsGroup.add(book);
+
+  // --- B. Cube Blanc (Nouveau) ---
+  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.5, 0.5), // Cube de 0.5 unités
+      cubeMaterial
+  );
+  cube.position.set(1, 0, 0); // Positionner le cube à droite
+  sceneObjectsGroup.add(cube);
   
-  // Cacher le preload une fois l'objet 3D ajouté à la scène
+  // Cacher le preload une fois les objets 3D ajoutés
   hidePreload();
 
-  // === 5. Animation du livre (rotation légère automatique) ===
+  // === 5. Animation ===
   let autoAngle = 0;
   function animate() {
     requestAnimationFrame(animate);
+    
     // Rotation légère auto Sauf si un contrôle tactile est actif
     if (!isControlling) {
         autoAngle += 0.01;
-        book.rotation.y = Math.sin(autoAngle) * 0.5 + initialRotationY; 
+        // Rotation sur le cube et le livre si non contrôlé
+        cube.rotation.y += 0.01; 
+        book.rotation.y = Math.sin(autoAngle) * 0.5; 
     }
     
     renderer.render(scene, camera);
@@ -198,16 +200,17 @@
   
   
   // ==========================================================
-  // === 7. Contrôles Tactiles (Zoom/Rotation avec deux doigts) (Nouveau) ===
+  // === 7. Contrôles Tactiles (Zoom/Rotation/Déplacement avec deux doigts) ===
   // ==========================================================
   let startDistance = 0;
-  let isControlling = false; // Indique si un mouvement tactile est en cours
+  let isControlling = false;
   
   let previousTouchPosition = null;
-  let initialRotationY = 0; // Stocker la rotation de base pour la combiner avec la rotation auto
+  let initialRotationY = 0;
+  let initialPosition = new THREE.Vector3(); // Pour la translation
   
   const MIN_SCALE = 0.5;
-  const MAX_SCALE = 3.0;
+  const MAX_SCALE = 5.0;
 
   function getDistance(touches) {
     const dx = touches[0].pageX - touches[1].pageX;
@@ -221,17 +224,28 @@
           y: (touches[0].pageY + touches[1].pageY) / 2
       };
   }
+  
+  // Convertit les coordonnées écran (pixels) en mouvement dans le monde 3D
+  function screenToWorldDelta(deltaX, deltaY) {
+    // Plus la caméra est loin, plus le mouvement doit être grand
+    const sensitivity = sceneObjectsGroup.position.z * 0.002;
+    return {
+        worldX: deltaX * sensitivity * camera.aspect,
+        worldY: -deltaY * sensitivity
+    };
+  }
 
   renderer.domElement.addEventListener('touchstart', (event) => {
     if (event.touches.length === 2) {
       event.preventDefault();
       isControlling = true;
-      initialRotationY = book.rotation.y; // Capture la rotation actuelle
+      initialRotationY = sceneObjectsGroup.rotation.y;
+      initialPosition.copy(sceneObjectsGroup.position); // Sauvegarder la position de départ
       
       // Zoom
       startDistance = getDistance(event.touches);
       
-      // Rotation
+      // Rotation/Déplacement
       previousTouchPosition = getMidPoint(event.touches);
     }
   });
@@ -240,41 +254,41 @@
     if (event.touches.length === 2) {
       event.preventDefault();
       
-      // --- Zoom (Pincer/Écarter) ---
-      const currentDistance = getDistance(event.touches);
-      const scaleFactor = currentDistance / startDistance;
-      let newScale = Math.min(Math.max(book.scale.x * scaleFactor, MIN_SCALE), MAX_SCALE);
-      book.scale.set(newScale, newScale, newScale);
-      
-      // Mettre à jour la distance de départ pour un mouvement continu
-      startDistance = currentDistance; 
-
-      // --- Rotation (Pivoter avec 2 doigts) ---
       const currentTouchPosition = getMidPoint(event.touches);
       
       if (previousTouchPosition) {
-          // Calculer le changement horizontal (rotation Y) et vertical (rotation X)
           const deltaX = currentTouchPosition.x - previousTouchPosition.x;
           const deltaY = currentTouchPosition.y - previousTouchPosition.y;
           
-          // La sensibilité peut être ajustée (diviser par un nombre plus grand pour moins de rotation)
-          const sensitivity = 0.005; 
+          // --- Déplacer (Translation XY) ---
+          if (event.ctrlKey) { // Optionnel: Utiliser une touche/un mode pour le déplacement
+            const worldDelta = screenToWorldDelta(deltaX, deltaY);
+            sceneObjectsGroup.position.x += worldDelta.worldX;
+            sceneObjectsGroup.position.y += worldDelta.worldY;
+          } 
           
-          // Rotation autour de l'axe Y (horizontal)
-          book.rotation.y += deltaX * sensitivity;
-          
-          // Rotation autour de l'axe X (vertical)
-          book.rotation.x += deltaY * sensitivity;
+          // --- Rotation (Pivoter) ---
+          else {
+              const rotationSensitivity = 0.005; 
+              
+              // Rotation autour de l'axe Y (horizontal)
+              sceneObjectsGroup.rotation.y += deltaX * rotationSensitivity;
+              
+              // Rotation autour de l'axe X (vertical)
+              sceneObjectsGroup.rotation.x += deltaY * rotationSensitivity;
+          }
 
-          // Limiter la rotation X pour éviter que le livre ne soit à l'envers
-          // book.rotation.x = Math.min(Math.max(book.rotation.x, -Math.PI / 2), Math.PI / 2);
-          
-          previousTouchPosition = currentTouchPosition; // Mettre à jour la position
-          
-          // Réinitialiser la rotation auto pour repartir de la rotation manuelle
-          autoAngle = book.rotation.y;
-          initialRotationY = 0;
+          previousTouchPosition = currentTouchPosition; 
       }
+      
+      // --- Zoom (Pincer/Écarter) ---
+      const currentDistance = getDistance(event.touches);
+      const scaleFactor = currentDistance / startDistance;
+      let newScale = Math.min(Math.max(sceneObjectsGroup.scale.x * scaleFactor, MIN_SCALE), MAX_SCALE);
+      sceneObjectsGroup.scale.set(newScale, newScale, newScale);
+      
+      // Mettre à jour la distance de départ pour un mouvement continu
+      startDistance = currentDistance; 
     }
   });
 

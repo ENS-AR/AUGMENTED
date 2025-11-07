@@ -21,31 +21,27 @@
     z-index: 1;
   }
 
-  /* Image de préchargement avec effet lumière */
+  /* === Préload du logo avec effet zoom === */
   #preload {
     position: fixed;
-    top: 40%;
+    top: 45%;
     left: 50%;
     transform: translate(-50%, -50%) scale(0);
-    z-index: 3;
     opacity: 0;
-    transition: transform 1s ease, opacity 1s ease;
+    z-index: 3;
+    transition: transform 3s ease, opacity 3s ease;
   }
   #preload.show {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
-    animation: glow 3s ease-in-out infinite alternate;
-  }
-  @keyframes glow {
-    0% { filter: drop-shadow(0 0 5px cyan) brightness(1); }
-    100% { filter: drop-shadow(0 0 25px white) brightness(1.5); }
   }
   #preload img {
-    height: 120px;
-    width: auto;
+    width: 140px;
+    height: auto;
+    filter: drop-shadow(0 0 25px cyan);
   }
 
-  /* Image sur l’espace réel */
+  /* Image interactive sur l’espace réel */
   #floating-image {
     position: absolute;
     top: 60%;
@@ -56,8 +52,22 @@
     border-radius: 10px;
     z-index: 3;
     display: none;
-    transition: transform 0.2s ease;
+    opacity: 0;
     box-shadow: 0 0 20px rgba(255,255,255,0.4);
+    transition: transform 0.2s ease, opacity 0.6s ease;
+  }
+
+  /* Logo fixe en bas */
+  #logo-bottom {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+  }
+  #logo-bottom img {
+    height: 40px;
+    width: auto;
   }
 </style>
 </head>
@@ -65,11 +75,14 @@
 
 <video id="camera" autoplay playsinline></video>
 
-<!-- Image de préchargement -->
+<!-- Logo preload -->
 <div id="preload"><img src="LogoAr.png" alt="Logo de préchargement"></div>
 
-<!-- Image sur l’espace -->
+<!-- Image interactive -->
 <img id="floating-image" src="https://www.pngplay.com/wp-content/uploads/13/Freepnglogos-Transparent-Background.png" alt="Objet interactif">
+
+<!-- Logo fixe en bas -->
+<div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
 
 <script>
 const video = document.getElementById('camera');
@@ -90,17 +103,23 @@ async function startCamera() {
 }
 startCamera();
 
-// === 2. Afficher le preload pendant 5s avec effet ===
+// === 2. Lancer l’effet de preload (zoom) ===
 setTimeout(() => preload.classList.add('show'), 100);
-setTimeout(() => preload.remove(), 5100);
 
-// === 3. Après 5s, afficher l’image interactive ===
+// Supprimer le preload après 3 secondes
 setTimeout(() => {
-  floatingImage.style.display = 'block';
-  initGestures(floatingImage);
-}, 5000);
+  preload.style.display = 'none';
+  showInteractiveImage();
+}, 3000);
 
-// === 4. Gestes tactiles (drag, pinch, rotation) ===
+// === 3. Afficher l’image interactive après le preload ===
+function showInteractiveImage() {
+  floatingImage.style.display = 'block';
+  setTimeout(() => floatingImage.style.opacity = '1', 100);
+  initGestures(floatingImage);
+}
+
+// === 4. Gestes tactiles : déplacement, zoom, rotation ===
 function initGestures(el) {
   let posX = window.innerWidth/2, posY = window.innerHeight/1.6;
   let scale = 1, rotation = 0;
@@ -143,5 +162,6 @@ function initGestures(el) {
   });
 }
 </script>
+
 </body>
 </html>

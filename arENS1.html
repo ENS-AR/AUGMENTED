@@ -2,10 +2,10 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <title>AR Cube - Réalité augmentée sans marqueur</title>
+    <title>Réalité augmentée - Cube 3D</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- A-Frame + WebXR -->
+    <!-- A-Frame (WebXR) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
     <style>
@@ -13,28 +13,24 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: white;
-        font-family: sans-serif;
+        background: transparent;
       }
 
-      /* Logo fixe en haut */
+      /* Logo en haut-centre */
       #logo {
         position: fixed;
         top: 10px;
         left: 50%;
         transform: translateX(-50%);
-        width: 150px;
-        z-index: 10;
+        width: 140px;
+        z-index: 5;
         pointer-events: none;
       }
 
       /* Préchargement */
       #preload {
         position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        top: 0; left: 0; right: 0; bottom: 0;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -43,12 +39,12 @@
       }
 
       #preload img {
-        width: 150px;
+        width: 140px;
         animation: pulse 1s infinite alternate;
       }
 
       @keyframes pulse {
-        from { opacity: 0.5; transform: scale(1); }
+        from { opacity: 0.6; transform: scale(1); }
         to { opacity: 1; transform: scale(1.1); }
       }
 
@@ -68,17 +64,18 @@
     <!-- Logo fixe -->
     <img id="logo" src="LogoAr.png" alt="Logo">
 
-    <!-- Scène WebXR AR -->
+    <!-- Scène AR markerless (WebXR) -->
     <a-scene
+      renderer="alpha: true; antialias: true;"
       vr-mode-ui="enabled: false"
-      renderer="antialias: true; alpha: true;"
-      xrweb="mode: ar;"
       embedded
+      xrweb="mode: ar;"
       device-orientation-permission-ui="enabled: true">
       
+      <!-- Cube blanc -->
       <a-entity id="cube"
                 geometry="primitive: box"
-                material="color: white; opacity: 0.9"
+                material="color: white; metalness: 0.1; roughness: 0.8;"
                 position="0 0 -1"
                 scale="0 0 0"
                 rotation="0 45 0">
@@ -93,17 +90,18 @@
       const cube = document.querySelector('#cube');
       let cubeVisible = false;
 
-      // --- Étape 1 : Attendre 4 secondes avant d’activer la caméra ---
+      // ⏱️ Attendre 4 secondes avant de démarrer la caméra
       window.addEventListener('load', () => {
         setTimeout(() => {
           preload.style.display = 'none';
           scene.style.display = 'block';
-          scene.enterVR(); // Active le mode AR automatiquement
+          // Lancer le mode AR (affiche la caméra réelle)
+          scene.enterVR();
         }, 4000);
       });
 
-      // --- Étape 2 : Clic sur la scène pour afficher le cube ---
-      scene.addEventListener('click', (event) => {
+      // 👆 Clic pour afficher le cube
+      scene.addEventListener('click', () => {
         if (!cubeVisible) {
           cubeVisible = true;
           cube.setAttribute('animation__scale', {
@@ -115,7 +113,7 @@
         }
       });
 
-      // --- Étape 3 : Rotation et zoom avec gestes tactiles ---
+      // ✋ Rotation & zoom
       let lastX = 0, lastY = 0, rotating = false;
       let initialDistance = 0, initialScale = 1;
 

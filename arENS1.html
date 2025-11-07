@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>AR Interface Universelle</title>
+<title>AR Image Interactive</title>
 <style>
   html, body {
     margin: 0;
@@ -11,7 +11,6 @@
     overflow: hidden;
     background: #000;
     touch-action: none;
-    font-family: sans-serif;
   }
 
   video {
@@ -22,52 +21,28 @@
     z-index: 1;
   }
 
-  /* Logo preload */
-  #logo-preload {
+  /* Image de préchargement avec effet lumière */
+  #preload {
     position: fixed;
-    top: 10px;
+    top: 40%;
     left: 50%;
-    transform: translateX(-50%) scale(0);
-    transition: transform 3s ease;
+    transform: translate(-50%, -50%) scale(0);
     z-index: 3;
+    opacity: 0;
+    transition: transform 1s ease, opacity 1s ease;
   }
-  #logo-preload.show {
-    transform: translateX(-50%) scale(0.7);
+  #preload.show {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    animation: glow 3s ease-in-out infinite alternate;
   }
-  #logo-preload img {
-    height: 60px;
+  @keyframes glow {
+    0% { filter: drop-shadow(0 0 5px cyan) brightness(1); }
+    100% { filter: drop-shadow(0 0 25px white) brightness(1.5); }
+  }
+  #preload img {
+    height: 120px;
     width: auto;
-  }
-
-  /* Logo fixe en bas */
-  #logo-bottom {
-    position: fixed;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 3;
-  }
-  #logo-bottom img {
-    height: 35px;
-    width: auto;
-  }
-
-  /* Boutons */
-  .ar-button {
-    position: absolute;
-    background: rgba(0,255,255,0.85);
-    color: #000;
-    padding: 10px 22px;
-    border-radius: 10px;
-    font-weight: bold;
-    cursor: pointer;
-    z-index: 4;
-    user-select: none;
-    touch-action: none;
-    transition: transform 0.2s;
-  }
-  .ar-button:active {
-    transform: scale(0.95);
   }
 
   /* Image sur l’espace réel */
@@ -75,12 +50,14 @@
     position: absolute;
     top: 60%;
     left: 50%;
-    transform: translate(-50%, -50%);
-    width: 150px;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    width: 200px;
     height: auto;
     border-radius: 10px;
     z-index: 3;
     display: none;
+    transition: transform 0.2s ease;
+    box-shadow: 0 0 20px rgba(255,255,255,0.4);
   }
 </style>
 </head>
@@ -88,18 +65,15 @@
 
 <video id="camera" autoplay playsinline></video>
 
-<!-- Logo preload -->
-<div id="logo-preload"><img src="LogoAr.png" alt="Logo Preload"></div>
+<!-- Image de préchargement -->
+<div id="preload"><img src="LogoAr.png" alt="Logo de préchargement"></div>
 
-<!-- Logo fixe en bas -->
-<div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
-
-<!-- Image affichée sur l’espace -->
-<img id="floating-image" src="https://www.pngplay.com/wp-content/uploads/13/Freepnglogos-Transparent-Background.png" alt="Objet">
+<!-- Image sur l’espace -->
+<img id="floating-image" src="https://www.pngplay.com/wp-content/uploads/13/Freepnglogos-Transparent-Background.png" alt="Objet interactif">
 
 <script>
 const video = document.getElementById('camera');
-const logoPreload = document.getElementById('logo-preload');
+const preload = document.getElementById('preload');
 const floatingImage = document.getElementById('floating-image');
 
 // === 1. Ouvrir la caméra arrière ===
@@ -116,71 +90,58 @@ async function startCamera() {
 }
 startCamera();
 
-// === 2. Préload du logo avec effet zoom ===
-const imgLogo = new Image();
-imgLogo.src = 'LogoAr.png';
-imgLogo.onload = () => setTimeout(() => logoPreload.classList.add('show'), 100);
+// === 2. Afficher le preload pendant 5s avec effet ===
+setTimeout(() => preload.classList.add('show'), 100);
+setTimeout(() => preload.remove(), 5100);
 
-// === 3. Afficher les boutons + image après 5 secondes ===
+// === 3. Après 5s, afficher l’image interactive ===
 setTimeout(() => {
-  showElements();
+  floatingImage.style.display = 'block';
+  initGestures(floatingImage);
 }, 5000);
 
-// === 4. Crée deux boutons et l’image ===
-function showElements() {
-  floatingImage.style.display = 'block'; // afficher image
+// === 4. Gestes tactiles (drag, pinch, rotation) ===
+function initGestures(el) {
+  let posX = window.innerWidth/2, posY = window.innerHeight/1.6;
+  let scale = 1, rotation = 0;
+  let startX=0, startY=0;
+  let initDist=0, initScale=1, initAngle=0, initRotation=0;
 
-  const links = [
-    { text: "Découvrir", url: "https://www.openai.com" },
-    { text: "Explorer", url: "https://www.wikipedia.org" }
-  ];
+  function getDistance(touches) {
+    const [t1, t2] = touches;
+    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  }
+  function getAngle(touches) {
+    const [t1, t2] = touches;
+    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+  }
 
-  const middleY = window.innerHeight / 2;
-  links.forEach((link, i) => {
-    const btn = document.createElement('div');
-    btn.className = 'ar-button';
-    btn.textContent = link.text;
-    const spacing = 140;
-    btn.style.left = (window.innerWidth / 2 + (i - 0.5) * spacing) + 'px';
-    btn.style.top = middleY + 'px';
-    document.body.appendChild(btn);
-
-    // Ouvrir popup
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.open(link.url, "_blank", "width=400,height=300,scrollbars=yes,resizable=yes");
-    });
-
-    // Glisser le bouton
-    let offsetX = 0, offsetY = 0;
-    btn.addEventListener('touchstart', (e)=>{
-      const t = e.touches[0];
-      offsetX = t.clientX - btn.offsetLeft;
-      offsetY = t.clientY - btn.offsetTop;
-    });
-    btn.addEventListener('touchmove', (e)=>{
-      e.preventDefault();
-      const t = e.touches[0];
-      btn.style.left = (t.clientX - offsetX) + 'px';
-      btn.style.top = (t.clientY - offsetY) + 'px';
-    });
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      startX = e.touches[0].clientX - posX;
+      startY = e.touches[0].clientY - posY;
+    } else if (e.touches.length === 2) {
+      initDist = getDistance(e.touches);
+      initScale = scale;
+      initAngle = getAngle(e.touches);
+      initRotation = rotation;
+    }
   });
 
-  // Glisser l'image aussi
-  let imgOffsetX=0, imgOffsetY=0;
-  floatingImage.addEventListener('touchstart', (e)=>{
-    const t = e.touches[0];
-    imgOffsetX = t.clientX - floatingImage.offsetLeft;
-    imgOffsetY = t.clientY - floatingImage.offsetTop;
-  });
-  floatingImage.addEventListener('touchmove', (e)=>{
+  el.addEventListener('touchmove', (e) => {
     e.preventDefault();
-    const t = e.touches[0];
-    floatingImage.style.left = (t.clientX - imgOffsetX) + 'px';
-    floatingImage.style.top = (t.clientY - imgOffsetY) + 'px';
+    if (e.touches.length === 1) {
+      posX = e.touches[0].clientX - startX;
+      posY = e.touches[0].clientY - startY;
+    } else if (e.touches.length === 2) {
+      const newDist = getDistance(e.touches);
+      scale = initScale * (newDist / initDist);
+      const newAngle = getAngle(e.touches);
+      rotation = initRotation + (newAngle - initAngle) * (180/Math.PI);
+    }
+    el.style.transform = `translate(${posX - window.innerWidth/2}px, ${posY - window.innerHeight/2}px) rotate(${rotation}deg) scale(${scale})`;
   });
 }
 </script>
-
 </body>
 </html>

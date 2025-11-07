@@ -124,8 +124,8 @@
 
   // === 2. Créer la scène Three.js ===
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-  camera.position.z = 3;
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+  camera.position.set(0, 0, 3); // Initialiser la caméra pour qu'elle soit un peu éloignée de l'objet
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -141,6 +141,7 @@
   const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
   const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
   const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  cube.position.set(0, 0, 0); // Positionner le cube au centre
   scene.add(cube);
 
   // === 5. Animation du cube ===
@@ -165,11 +166,12 @@
 
   // === 8. Préchargement et affichage de l'objet ===
   window.onload = () => {
-    // Masquer l'écran de préchargement
+    // Masquer l'écran de préchargement après 3 secondes
     setTimeout(() => {
       preloadDiv.classList.add('hidden');
     }, 3000); // Attendre 3 secondes avant de cacher le préchargement
   };
+
 </script>
 </body>
 </html>

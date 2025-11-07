@@ -117,7 +117,11 @@ book.add(backCover, pages, frontCover);
 scene.add(book);
 
 // === 5. Cube 3D ===
-
+const cubeGeom = new THREE.BoxGeometry(0.5,0.5,0.5);
+const cubeMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+const cube = new THREE.Mesh(cubeGeom, cubeMat);
+cube.position.set(1,0,0);
+scene.add(cube);
 
 // === 6. Gestes interactifs ===
 let startX=0, startY=0, posX=0, posY=0;
@@ -182,5 +186,6 @@ window.addEventListener('resize', ()=>{
 </script>
 </body>
 </html>
+
 
 

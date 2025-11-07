@@ -2,14 +2,15 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AR – PDF sur espace réel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AR PDF interactif</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
     background: #000;
+    touch-action: none; /* Important pour activer les gestes tactiles */
   }
 
   /* Caméra plein écran */
@@ -23,21 +24,22 @@
     background: #000;
   }
 
-  /* Conteneur AR (le PDF affiché dans l’espace réel) */
+  /* Conteneur du PDF flottant */
   #ar-pdf {
     position: fixed;
-    top: 10%;              /* en haut du milieu */
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
-    width: 80%;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    width: 70%;
     height: 60%;
     z-index: 2;
-    box-shadow: 0 0 20px rgba(0,255,255,0.5);
     border-radius: 12px;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(4px);
-    animation: fadeIn 1s ease-in;
+    background: rgba(255,255,255,0.9);
+    box-shadow: 0 0 25px rgba(0,255,255,0.5);
+    backdrop-filter: blur(6px);
+    touch-action: none;
+    transition: box-shadow 0.2s;
   }
 
   /* PDF intégré */
@@ -47,16 +49,16 @@
     border: none;
   }
 
-  /* Logo fixe en haut à droite */
+  /* Logo fixe */
   #ui-logo {
     position: fixed;
     top: 10px;
     right: 10px;
     z-index: 3;
   }
-
   #ui-logo img {
     height: 50px;
+    width: auto;
     filter: drop-shadow(0 0 5px rgba(0,255,255,0.6));
   }
 
@@ -74,11 +76,6 @@
     z-index: 5;
     font-family: sans-serif;
   }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-    to { opacity: 1; transform: translateX(-50%) translateY(0); }
-  }
 </style>
 </head>
 <body>
@@ -86,20 +83,21 @@
   <!-- Flux caméra -->
   <video id="camera" autoplay playsinline></video>
 
-  <!-- PDF sur l’espace réel -->
+  <!-- PDF flottant -->
   <div id="ar-pdf">
     <iframe src="https://api.printnode.com/static/test/pdf/multipage.pdf"></iframe>
   </div>
 
   <!-- Logo fixe -->
   <div id="ui-logo">
-     <iframe src="https://api.printnode.com/static/test/pdf/multipage.pdf"  alt="Logo"></iframe>
+    <img src="LogoAR.png" alt="Logo">
   </div>
 
   <!-- Message d’erreur -->
   <div id="error"></div>
 
 <script>
+  // === OUVERTURE DE LA CAMÉRA ===
   const video = document.getElementById('camera');
   const errorMsg = document.getElementById('error');
 
@@ -127,8 +125,65 @@
     errorMsg.textContent = "Caméra non supportée sur ce navigateur.";
     errorMsg.style.display = "block";
   }
+
+  // === INTERACTIONS TACTILES SUR LE PDF ===
+  const arPdf = document.getElementById('ar-pdf');
+  let startX = 0, startY = 0;
+  let posX = window.innerWidth / 2;
+  let posY = window.innerHeight / 2;
+  let scale = 1;
+  let rotation = 0;
+
+  let initialDistance = 0;
+  let initialScale = 1;
+  let initialRotation = 0;
+  let initialAngle = 0;
+
+  function distance(touches) {
+    const [t1, t2] = touches;
+    const dx = t2.clientX - t1.clientX;
+    const dy = t2.clientY - t1.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function angle(touches) {
+    const [t1, t2] = touches;
+    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+  }
+
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      startX = e.touches[0].clientX - posX;
+      startY = e.touches[0].clientY - posY;
+    } else if (e.touches.length === 2) {
+      initialDistance = distance(e.touches);
+      initialScale = scale;
+      initialRotation = rotation;
+      initialAngle = angle(e.touches);
+    }
+  });
+
+  document.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      posX = e.touches[0].clientX - startX;
+      posY = e.touches[0].clientY - startY;
+    } else if (e.touches.length === 2) {
+      const newDistance = distance(e.touches);
+      const scaleChange = newDistance / initialDistance;
+      scale = initialScale * scaleChange;
+
+      const newAngle = angle(e.touches);
+      rotation = initialRotation + (newAngle - initialAngle) * (180 / Math.PI);
+    }
+
+    arPdf.style.transform = 
+      `translate(${posX - window.innerWidth / 2}px, ${posY - window.innerHeight / 2}px)
+       translate(-50%, -50%)
+       scale(${scale})
+       rotate(${rotation}deg)`;
+  });
 </script>
 
 </body>
 </html>
-

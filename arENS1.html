@@ -1,146 +1,297 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR Automatique</title>
-  <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-    }
-    canvas {
-      display: block;
-    }
-    #logo {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 10;
-    }
-    #logo img {
-      height: 50px;
-    }
-    #message {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.6);
-      color: #fff;
-      padding: 10px 16px;
-      border-radius: 10px;
-      font-family: sans-serif;
-      font-size: 14px;
-    }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AR texte automatique</title>
+<style>
+  html,body{height:100%;margin:0;background:#000;overflow:hidden;font-family:system-ui,Segoe UI,Roboto,Arial}
+  #overlayUI{position:fixed;left:0;right:0;top:0;bottom:0;pointer-events:none}
+  #logo{position:fixed;top:12px;right:12px;z-index:999;pointer-events:auto}
+  #logo img{height:44px;display:block}
+  #info{position:fixed;left:12px;bottom:12px;z-index:999;pointer-events:auto;background:rgba(0,0,0,0.6);color:#fff;padding:8px 10px;border-radius:8px}
+  #fallbackVideo{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#000}
+  canvas{position:fixed;left:0;top:0;z-index:1}
+  #hintTap{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.6);color:#fff;padding:12px 18px;border-radius:10px;z-index:1000;display:none;pointer-events:auto}
+</style>
 </head>
 <body>
-  <!-- Logo fixe -->
-  <div id="logo"><img src="LogoAR.png" alt="Logo" /></div>
-  <div id="message">Chargement de la réalité augmentée...</div>
+  <!-- Logo (optionnel) -->
+  <div id="logo"><img src="LogoAR.png" alt="logo" /></div>
+
+  <div id="overlayUI">
+    <div id="info">Initialisation AR…</div>
+    <div id="hintTap">Touchez l'écran pour activer la caméra</div>
+  </div>
+
+  <!-- fallback video (visible only when getUserMedia used) -->
+  <video id="fallbackVideo" autoplay playsinline muted></video>
 
   <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
-    let scene, camera, renderer, reticle;
-    let hitTestSource = null;
-    let hitTestSourceRequested = false;
-    let placed = false;
-    let object3D;
+  // --- éléments UI ---
+  const info = document.getElementById('info');
+  const hintTap = document.getElementById('hintTap');
+  const fallbackVideo = document.getElementById('fallbackVideo');
 
-    init();
-    animate();
+  // THREE renderer / scène communs
+  let renderer, scene, camera;
+  let textMesh = null;
+  let xrRefSpace = null, hitTestSource = null;
 
-    async function init() {
-      // Configuration du rendu
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  // Text to display in AR
+  const AR_TEXT = "Bonjour — Ceci est du texte AR"; // modifie ici le texte
+
+  // Init renderer + scene
+  function initThree() {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.xr.enabled = true;
+    renderer.domElement.style.position = 'fixed';
+    renderer.domElement.style.left = '0';
+    renderer.domElement.style.top = '0';
+    renderer.domElement.style.zIndex = '1';
+    document.body.appendChild(renderer.domElement);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 50);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1.0));
+    window.addEventListener('resize', onWindowResize);
+  }
+
+  function onWindowResize(){
+    if (camera && renderer) {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      document.body.appendChild(renderer.domElement);
+    }
+  }
 
-      scene = new THREE.Scene();
+  // Crée une texture à partir d'un canvas contenant le texte
+  function createTextTexture(text){
+    const margin = 24;
+    const fontSize = 48;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
 
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1));
+    // fond semi-translucide arrondi
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    roundRect(ctx, margin/2, margin/2, canvas.width - margin, canvas.height - margin, 36);
+    ctx.fill();
 
-      // Reticle pour savoir où placer l’objet
-      reticle = new THREE.Mesh(
-        new THREE.RingGeometry(0.07, 0.09, 32).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial({ color: 0x00ffcc })
-      );
-      reticle.matrixAutoUpdate = false;
-      reticle.visible = false;
-      scene.add(reticle);
+    // texte
+    ctx.fillStyle = '#0b5cff';
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const x = canvas.width / 2;
+    const y = canvas.height / 2;
+    wrapText(ctx, text, x, y, canvas.width - margin*4, fontSize + 6);
 
-      // Démarrage automatique de la session AR
-      if (navigator.xr) {
-        const supported = await navigator.xr.isSessionSupported('immersive-ar');
-        if (supported) {
-          const session = await navigator.xr.requestSession('immersive-ar', {
-            requiredFeatures: ['hit-test', 'dom-overlay'],
-            domOverlay: { root: document.body }
-          });
-          onSessionStarted(session);
-        } else {
-          document.getElementById('message').textContent =
-            'AR non supportée sur ce navigateur.';
-        }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.encoding = THREE.sRGBEncoding;
+    return tex;
+  }
+
+  // utilities
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // multi-line wrap centered
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+    const lines = [];
+    for (let n = 0; n < words.length; n++) {
+      const testLine = line + words[n] + ' ';
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && n > 0) {
+        lines.push(line.trim());
+        line = words[n] + ' ';
       } else {
-        document.getElementById('message').textContent =
-          'WebXR non disponible sur cet appareil.';
+        line = testLine;
       }
     }
+    lines.push(line.trim());
+    // draw lines
+    const totalHeight = lines.length * lineHeight;
+    let startY = y - totalHeight/2 + lineHeight/2;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], x, startY + i * lineHeight);
+    }
+  }
 
-    async function onSessionStarted(session) {
-      renderer.xr.setSession(session);
+  // Crée et retourne un mesh plane avec la texture texte
+  function makeTextMesh(text) {
+    const tex = createTextTexture(text);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+    const aspect = tex.image.width / tex.image.height;
+    const heightMeters = 0.25; // taille approximative en mètres (ajuste)
+    const widthMeters = heightMeters * aspect;
+    const geom = new THREE.PlaneGeometry(widthMeters, heightMeters);
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.renderOrder = 999;
+    return mesh;
+  }
 
-      const refSpace = await session.requestReferenceSpace('local');
-      const viewerSpace = await session.requestReferenceSpace('viewer');
-      hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-      hitTestSourceRequested = true;
-
-      renderer.setAnimationLoop((timestamp, frame) => {
-        if (frame) {
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-          if (hitTestResults.length > 0) {
-            const hit = hitTestResults[0];
-            const pose = hit.getPose(refSpace);
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-
-            // Place automatiquement l’objet une seule fois
-            if (!placed) {
-              placeObject(pose);
-              placed = true;
-              reticle.visible = false;
-              document.getElementById('message').style.display = 'none';
-            }
+  // Rendu WebXR loop (si session active)
+  function xrLoop(timestamp, frame) {
+    if (frame && hitTestSource && xrRefSpace) {
+      const hitResults = frame.getHitTestResults(hitTestSource);
+      if (hitResults.length > 0) {
+        const hit = hitResults[0];
+        const pose = hit.getPose(xrRefSpace);
+        if (pose) {
+          // si pas encore placé, on place le texte
+          if (!textMesh) {
+            textMesh = makeTextMesh(AR_TEXT);
+            // position & orientation depuis la matrice
+            const m = new THREE.Matrix4().fromArray(pose.transform.matrix);
+            m.decompose(textMesh.position, textMesh.quaternion, textMesh.scale);
+            // relever légèrement le panneau pour qu'il ne touche pas la surface
+            textMesh.position.y += 0.02;
+            scene.add(textMesh);
+            info.textContent = "Texte placé dans l'espace.";
+          } else {
+            // on peut garder le texte face caméra (billboard)
+            const camPos = new THREE.Vector3();
+            camera.getWorldPosition(camPos);
+            textMesh.lookAt(camPos);
           }
         }
-        renderer.render(scene, camera);
-      });
+      } else {
+        // pas de hit - on peut afficher reticle (optionnel)
+      }
     }
+    renderer.render(scene, camera);
+  }
 
-    function placeObject(pose) {
-      const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-      const material = new THREE.MeshStandardMaterial({ color: 0xff5533 });
-      object3D = new THREE.Mesh(geometry, material);
-      const matrix = new THREE.Matrix4().fromArray(pose.transform.matrix);
-      matrix.decompose(object3D.position, object3D.quaternion, object3D.scale);
-      scene.add(object3D);
+  // Tente de démarrer une session WebXR AR et configurer le hit-test
+  async function startWebXR() {
+    if (!navigator.xr) {
+      throw new Error('WebXR non disponible');
     }
+    const supported = await navigator.xr.isSessionSupported('immersive-ar');
+    if (!supported) throw new Error('immersive-ar non supporté');
 
-    function animate() {
+    // Demande la session ; certains navigateurs bloquent si pas de geste utilisateur
+    const session = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test', 'dom-overlay'],
+      domOverlay: { root: document.body }
+    });
+    renderer.xr.setSession(session);
+
+    // référence d'espace
+    xrRefSpace = await session.requestReferenceSpace('local');
+    const viewerRefSpace = await session.requestReferenceSpace('viewer');
+    hitTestSource = await session.requestHitTestSource({ space: viewerRefSpace });
+
+    // loop personnalisé
+    session.requestAnimationFrame(function onXRFrame(time, frame) {
+      xrLoop(time, frame);
+      session.requestAnimationFrame(onXRFrame);
+    });
+
+    session.addEventListener('end', () => {
+      hitTestSource = null;
+      xrRefSpace = null;
+      info.textContent = "Session AR terminée.";
+    });
+    info.textContent = "Session AR démarrée — recherche de surface…";
+  }
+
+  // Fallback: ouverture caméra via getUserMedia + affichage du texte en overlay (simulateur AR)
+  async function startFallbackCamera() {
+    info.textContent = "WebXR indisponible — fallback caméra activé.";
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      fallbackVideo.srcObject = stream;
+      fallbackVideo.style.display = 'block';
+      // crée scène three transparente et place le texte à une distance fixe (fausse profondeur)
+      // Ici on positionne le texte à z = -1m (devant la caméra) et on aligne pour qu'il apparaisse en bas-centre.
+      textMesh = makeTextMesh(AR_TEXT);
+      textMesh.position.set(0, -0.2, -1); // x,y,z en mètres dans espace caméra
+      scene.add(textMesh);
+      info.textContent = "Texte affiché en overlay (mode fallback).";
+      // loop: orienter texte face caméra
       renderer.setAnimationLoop(() => {
-        if (object3D) {
-          object3D.rotation.y += 0.01; // légère rotation pour effet visuel
+        if (textMesh) {
+          // pour le fallback, on veut le texte toujours face caméra
+          const camWorldPos = new THREE.Vector3();
+          camera.getWorldPosition(camWorldPos);
+          textMesh.lookAt(camWorldPos);
+          // légère animation pour rendre l'effet plus vivant
+          textMesh.rotation.z = Math.sin(performance.now() * 0.001) * 0.02;
         }
         renderer.render(scene, camera);
       });
+    } catch (err) {
+      console.error(err);
+      throw new Error('Impossible d\'ouvrir la caméra.');
     }
+  }
+
+  // Main: essaye WebXR, sinon fallback
+  async function mainTryStart() {
+    initThree();
+
+    // Tenter WebXR automatiquement. Certains navigateurs exigent un geste ; on essaiera quand même.
+    try {
+      await startWebXR();
+      // si startWebXR réussit, rien d'autre à faire (xrLoop fera le rendu)
+    } catch (err) {
+      console.warn('WebXR non démarré automatiquement:', err);
+      // Si l'échec montre que une interaction est nécessaire, afficher hintTap
+      hintTap.style.display = 'none';
+      const needGesture = /gesture|user|prompt|interaction|click/i.test(String(err.message));
+      // Afficher hintTap parce que souvent il faut toucher l'écran pour autoriser la caméra
+      hintTap.style.display = 'block';
+      info.textContent = 'Appuyez sur l\'écran pour autoriser la caméra (fallback si nécessaire).';
+      // Enregistre un unique handler de tap qui tentera à nouveau WebXR puis fallback
+      const onUserTap = async () => {
+        hintTap.style.display = 'none';
+        document.removeEventListener('click', onUserTap);
+        try {
+          await startWebXR();
+        } catch (err2) {
+          console.warn('Nouvelle tentative WebXR échouée:', err2);
+          // partir en fallback getUserMedia
+          try {
+            await startFallbackCamera();
+          } catch (err3) {
+            info.textContent = 'Impossible d\'accéder à la caméra.';
+            console.error(err3);
+          }
+        }
+      };
+      // invite l'utilisateur à toucher
+      document.addEventListener('click', onUserTap, { once: true, passive: true });
+    }
+  }
+
+  // démarrage auto (essaie sans attente)
+  mainTryStart();
+
+  // Si on quitte la page, arrêter streams XR / media
+  window.addEventListener('pagehide', ()=>{
+    try { if (renderer && renderer.xr && renderer.xr.getSession()) renderer.xr.getSession().end(); } catch(e) {}
+    if (fallbackVideo && fallbackVideo.srcObject) {
+      const tracks = fallbackVideo.srcObject.getTracks();
+      tracks.forEach(t => t.stop());
+    }
+  });
+
   </script>
 </body>
 </html>

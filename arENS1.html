@@ -1,19 +1,18 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AR universelle (caméra + texte)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AR – Logo sur l’espace réel</title>
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
     background: #000;
-    font-family: system-ui, Arial, sans-serif;
   }
 
-  /* Vidéo plein écran (caméra) */
+  /* Caméra plein écran */
   #camera {
     position: fixed;
     top: 0; left: 0;
@@ -24,99 +23,104 @@
     background: #000;
   }
 
-  /* Texte AR flottant */
-  #ar-text {
+  /* Logo AR flottant */
+  #ar-object {
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
-    color: #00ffff;
-    font-size: 2em;
-    font-weight: bold;
-    text-shadow: 0 0 10px #000;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 10px 20px;
-    border-radius: 10px;
+    transform: translate(-50%, -50%) scale(1);
     z-index: 2;
-    animation: float 3s ease-in-out infinite;
+    animation: float 4s ease-in-out infinite;
   }
 
-  /* Logo fixe */
-  #logo {
+  #ar-object img {
+    width: 150px;
+    height: auto;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 10px rgba(0,255,255,0.8));
+  }
+
+  /* Logo fixe (interface) */
+  #ui-logo {
     position: fixed;
     top: 10px;
     right: 10px;
     z-index: 3;
   }
-  #logo img {
+
+  #ui-logo img {
     height: 50px;
-    width: auto;
   }
 
-  /* Animation du texte flottant */
+  /* Effet de flottement */
   @keyframes float {
-    0%, 100% { transform: translate(-50%, -52%); }
-    50% { transform: translate(-50%, -48%); }
+    0%, 100% { transform: translate(-50%, -52%) scale(1); }
+    50% { transform: translate(-50%, -48%) scale(1.05); }
   }
 
   #error {
     position: fixed;
-    top: 50%;
+    bottom: 20px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
+    transform: translateX(-50%);
     background: rgba(0,0,0,0.7);
-    padding: 20px;
+    color: #fff;
+    padding: 10px 20px;
     border-radius: 10px;
     display: none;
     z-index: 5;
+    font-family: sans-serif;
   }
 </style>
 </head>
 <body>
 
-  <!-- flux caméra -->
+  <!-- Flux caméra -->
   <video id="camera" autoplay playsinline></video>
 
-  <!-- texte flottant simulant AR -->
-  <div id="ar-text">👋 Bonjour en AR !</div>
+  <!-- Objet AR : ton logo sur l’espace -->
+  <div id="ar-object">
+    <img src="LogoAR.png" alt="Logo AR">
+  </div>
 
-  <!-- logo fixe -->
-  <div id="logo"><img src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="logo"></div>
+  <!-- Logo d’interface fixe (facultatif) -->
+  <div id="ui-logo">
+    <img src="LogoAR.png" alt="Logo fixe">
+  </div>
 
-  <!-- message d’erreur -->
+  <!-- Message d’erreur -->
   <div id="error"></div>
 
-  <script>
-    const video = document.getElementById('camera');
-    const errorMsg = document.getElementById('error');
+<script>
+  const video = document.getElementById('camera');
+  const errorMsg = document.getElementById('error');
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" }, // caméra arrière si possible
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        });
-        video.srcObject = stream;
-      } catch (err) {
-        console.error('Erreur caméra:', err);
-        errorMsg.textContent = "Impossible d'accéder à la caméra : " + err.message;
-        errorMsg.style.display = "block";
-      }
-    }
-
-    // Démarrage automatique
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      startCamera();
-    } else {
-      errorMsg.textContent = "Ce navigateur ne supporte pas l'accès à la caméra.";
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" }, // caméra arrière si possible
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+      video.srcObject = stream;
+    } catch (err) {
+      console.error('Erreur caméra :', err);
+      errorMsg.textContent = "Impossible d'accéder à la caméra : " + err.message;
       errorMsg.style.display = "block";
     }
-  </script>
+  }
+
+  // Démarrage automatique
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    startCamera();
+  } else {
+    errorMsg.textContent = "Ce navigateur ne supporte pas la caméra.";
+    errorMsg.style.display = "block";
+  }
+</script>
 
 </body>
 </html>

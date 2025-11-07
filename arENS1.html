@@ -1,148 +1,204 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Livre 3D sur espace réel</title>
-<style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-    background: #000;
-  }
-  video {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 1;
-  }
-  canvas {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 2;
-  }
-  #ui-logo {
-    position: fixed;
-    top: 10px;
-    right: 20px;
-    z-index: 3;
-  }
-  #ui-logo img {
-    height: 30px;
-    filter: drop-shadow(0 0 8px rgba(0,255,255,0.6));
-  }
-  #error {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.7);
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 10px;
-    display: none;
-    z-index: 4;
-    font-family: sans-serif;
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cube 3D sur espace réel</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    /* === Vidéo (caméra du monde réel) === */
+    video {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      display: none; /* cachée pendant le preload */
+    }
+
+    /* === Canvas Three.js === */
+    canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 2;
+      display: none; /* caché pendant le preload */
+    }
+
+    /* === Préchargement === */
+    #preload {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #1a1a1a; 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      opacity: 1;
+      transition: opacity 1s ease-out;
+    }
+
+    #preload.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #preload img {
+      height: 150px; 
+      width: 150px;
+      object-fit: contain;
+      animation: cinematic-zoom 3s forwards, pulse 1.5s infinite alternate; 
+    }
+
+    @keyframes cinematic-zoom {
+      from { transform: scale(1); }
+      to { transform: scale(1.5); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.8; }
+      50% { opacity: 1; }
+    }
+
+    /* === Logo fixe en haut au centre === */
+    #ui-logo {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+    }
+
+    #ui-logo img {
+      height: 25px;
+    }
+
+    /* === Message d’erreur === */
+    #error {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 10px;
+      display: none;
+      z-index: 4;
+      font-family: sans-serif;
+    }
+  </style>
 </head>
 <body>
+  <!-- Écran de préchargement -->
+  <div id="preload">
+    <img src="LogoAr.png" alt="Logo">
+  </div>
+
+  <!-- Flux caméra -->
   <video id="camera" autoplay playsinline></video>
+
+  <!-- Logo fixe -->
   <div id="ui-logo"><img src="LogoAr.png" alt="Logo"></div>
+
+  <!-- Message d’erreur -->
   <div id="error"></div>
 
-<script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-  const video = document.getElementById('camera');
-  const errorMsg = document.getElementById('error');
+    const video = document.getElementById('camera');
+    const errorMsg = document.getElementById('error');
+    const preloadDiv = document.getElementById('preload');
 
-  // === 1. Ouvrir la caméra ===
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false
-      });
-      video.srcObject = stream;
-    } catch (err) {
-      errorMsg.textContent = "Erreur caméra : " + err.message;
-      errorMsg.style.display = "block";
-    }
-  }
-  startCamera();
+    // === 1. Initialisation de la scène Three.js ===
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 100);
+    camera.position.set(0, 0, 3);
 
-  // === 2. Créer la scène Three.js ===
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
-  camera.position.z = 2;
-
-  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // === 3. Lumière ===
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1, 1, 2);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-
-  // === 4. Créer un livre 3D (2 couvertures + pages) ===
-  const coverMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
-  const pageMaterial = new THREE.MeshStandardMaterial({ color: 0xfdf6e3 });
-
-  const coverThickness = 0.05;
-  const coverWidth = 1.2;
-  const coverHeight = 0.8;
-
-  // Couverture arrière
-  const backCover = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness),
-    coverMaterial
-  );
-  backCover.position.z = 0;
-
-  // Pages
-  const pages = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth * 0.98, coverHeight * 0.95, coverThickness * 4),
-    pageMaterial
-  );
-  pages.position.z = coverThickness * 2;
-
-  // Couverture avant
-  const frontCover = new THREE.Mesh(
-    new THREE.BoxGeometry(coverWidth, coverHeight, coverThickness),
-    coverMaterial
-  );
-  frontCover.position.z = coverThickness * 4;
-
-  // Groupe "livre"
-  const book = new THREE.Group();
-  book.add(backCover);
-  book.add(pages);
-  book.add(frontCover);
-  scene.add(book);
-
-  // === 5. Animation du livre ===
-  let angle = 0;
-  function animate() {
-    requestAnimationFrame(animate);
-    angle += 0.01;
-    book.rotation.y = Math.sin(angle) * 0.5; // léger mouvement
-    book.rotation.x = 0.2;
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  // === 6. Ajuster la taille de l’écran ===
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-</script>
+    document.body.appendChild(renderer.domElement);
+
+    // === 2. Lumières ===
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 2);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+    // === 3. Préparation du cube (mais NE PAS encore l’ajouter) ===
+    const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+
+    let cubeAdded = false; // Flag : pour éviter de recréer le cube plusieurs fois
+
+    // === 4. Contrôles tactiles ===
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableZoom = true;
+    controls.enableRotate = true;
+    controls.enablePan = true;
+
+    // === 5. Animation de la scène ===
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    // === 6. Gestion du redimensionnement ===
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // === 7. Démarrage de la caméra ===
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        errorMsg.textContent = "Erreur caméra : " + err.message;
+        errorMsg.style.display = "block";
+      }
+    }
+
+    // === 8. Lancement après le preload ===
+    window.onload = () => {
+      // Préload visible pendant 3 secondes
+      setTimeout(() => {
+        preloadDiv.classList.add('hidden'); // fade out
+        setTimeout(() => {
+          preloadDiv.style.display = "none"; // supprime l’overlay après le fondu
+          // Active la caméra et affiche la scène
+          startCamera();
+          video.style.display = "block";
+          renderer.domElement.style.display = "block";
+          animate();
+        }, 1000); // délai du fondu
+      }, 3000); // durée du preload
+    };
+
+    // === 9. Ajouter l'objet 3D au clic sur l'écran ===
+    document.body.addEventListener('click', (event) => {
+      if (!cubeAdded) {
+        // On positionne le cube au centre
+        cube.position.set(0, 0, 0);
+        scene.add(cube);
+        cubeAdded = true;
+      }
+    });
+  </script>
 </body>
 </html>

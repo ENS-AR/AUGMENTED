@@ -1,90 +1,141 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <title>Réalité augmentée : Terre 3D</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <style>
-    body, html {
-      margin: 0; padding: 0;
-      height: 100%; overflow: hidden;
-      background: white; color: #fff;
-      font-family: Arial, sans-serif;
-    }
-    #overlay {
-      position: absolute;
-      top: 8px; left: 8px;
-      background: rgba(0,0,0,0.4);
-      padding: 10px 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 2;
-    }
-    #logo {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      z-index: 2;
-      width: 300px;
-      opacity: 0.9;
-      transition: transform 0.3s ease;
-    }
-    #logo:hover {
-      transform: scale(1.05);
-      opacity: 1;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Objet 3D sur caméra</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
 
-  <!-- Librairies -->
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 1;
+  }
+
+  canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 2;
+    display: none;
+  }
+
+  /* Logo fixe en bas */
+  #logo-bottom {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%) scale(1);
+    z-index: 3;
+    transition: all 3s ease;
+  }
+
+  #logo-bottom img {
+    height: 60px;
+    width: auto;
+    filter: drop-shadow(0 0 20px cyan);
+  }
+
+  /* Animation du logo (préload) */
+  #logo-bottom.animate {
+    bottom: 45%;
+    transform: translateX(-50%) scale(2);
+  }
+
+</style>
 </head>
 <body>
-  <div id="overlay">
-    <b>🪄 Réalité augmentée :</b> pointez la caméra vers le marqueur <b>Hiro</b>.<br>
-    👉 Touchez l’écran pour changer la taille de la Terre.
-  </div>
 
-  <!-- Logo en bas -->
-  <img id="logo" src="LogoAr.png" alt="Logo" />
+<video id="camera" autoplay playsinline></video>
+<div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-    <!-- Lumières -->
-    <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-    <a-entity light="type: directional; intensity: 0.6" position="1 1 0.5"></a-entity>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
-    <!-- Marqueur Hiro -->
-    <a-marker preset="hiro">
-      <!-- Objet 3D Terre -->
-      <a-entity id="terre"
-        gltf-model="https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/EarthSatellite/glTF-Binary/EarthSatellite.glb"
-        scale="0.3 0.3 0.3"
-        rotation="0 0 0"
-        animation="property: rotation; to: 0 360 0; loop: true; dur: 15000; easing: linear"
-        position="0 0 0">
-      </a-entity>
+const video = document.getElementById('camera');
+const logo = document.getElementById('logo-bottom');
+let renderer, scene, camera, model;
 
-      <!-- Ombre au sol -->
-      <a-plane rotation="-90 0 0" width="2" height="2" color="#111" opacity="0.2"></a-plane>
-    </a-marker>
-
-    <!-- Caméra -->
-    <a-entity camera></a-entity>
-  </a-scene>
-
-  <script>
-    const terre = document.getElementById('terre');
-    let taille = 0;
-    const tailles = [
-      { scale: '0.3 0.3 0.3' },
-      { scale: '0.5 0.5 0.5' },
-      { scale: '0.2 0.2 0.2' }
-    ];
-
-    window.addEventListener('click', () => {
-      taille = (taille + 1) % tailles.length;
-      terre.setAttribute('scale', tailles[taille].scale);
+// === 1. Démarre la caméra ===
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
     });
-  </script>
+    video.srcObject = stream;
+  } catch (err) {
+    console.error("Erreur caméra :", err);
+  }
+}
+startCamera();
+
+// === 2. Animation du logo (préload) ===
+setTimeout(() => logo.classList.add('animate'), 100);
+setTimeout(() => {
+  logo.classList.remove('animate');
+  initScene();
+}, 3100);
+
+// === 3. Créer la scène Three.js ===
+function initScene() {
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 1, 3);
+
+  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.domElement.style.display = 'block';
+  document.body.appendChild(renderer.domElement);
+
+  // Lumières
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(2, 4, 5);
+  scene.add(light);
+
+  // === 4. Charger ton objet 3D ici ===
+  const loader = new GLTFLoader();
+  const modelURL = "ready_player_me_harry_potter.glb"; // 🔹 Remplace par ton lien .glb/.gltf
+  loader.load(modelURL, (gltf) => {
+    model = gltf.scene;
+    model.scale.set(1.2, 1.2, 1.2);
+    model.position.set(0, 0, 0);
+    scene.add(model);
+  });
+
+  // === 5. Contrôles tactiles ===
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.enableZoom = true;
+  controls.enablePan = true;
+  controls.target.set(0, 0.5, 0);
+
+  // === 6. Boucle d'animation ===
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // === 7. Redimensionner ===
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+</script>
 </body>
 </html>

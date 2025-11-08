@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<title>Objet 3D sur caméra</title>
+<title>AR Objet 3D + Caméra</title>
 <style>
   html, body {
     margin: 0;
@@ -25,7 +25,6 @@
     top: 0; left: 0;
     width: 100%; height: 100%;
     z-index: 2;
-    display: none;
   }
 
   /* Logo fixe en bas */
@@ -49,14 +48,17 @@
     bottom: 45%;
     transform: translateX(-50%) scale(2);
   }
-
 </style>
 </head>
 <body>
 
+<!-- Caméra -->
 <video id="camera" autoplay playsinline></video>
+
+<!-- Logo -->
 <div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
 
+<!-- Librairies Three.js -->
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
@@ -66,7 +68,7 @@ const video = document.getElementById('camera');
 const logo = document.getElementById('logo-bottom');
 let renderer, scene, camera, model;
 
-// === 1. Démarre la caméra ===
+// === 1. Démarrage de la caméra ===
 async function startCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -75,7 +77,13 @@ async function startCamera() {
     });
     video.srcObject = stream;
   } catch (err) {
-    console.error("Erreur caméra :", err);
+    console.warn("Caméra arrière non dispo, on passe à la frontale.");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+    } catch (err2) {
+      alert("Impossible d'accéder à la caméra : " + err2.message);
+    }
   }
 }
 startCamera();
@@ -87,7 +95,7 @@ setTimeout(() => {
   initScene();
 }, 3100);
 
-// === 3. Créer la scène Three.js ===
+// === 3. Création de la scène Three.js ===
 function initScene() {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -95,33 +103,33 @@ function initScene() {
 
   renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.domElement.style.display = 'block';
   document.body.appendChild(renderer.domElement);
 
   // Lumières
-  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(2, 4, 5);
   scene.add(light);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-  // === 4. Charger ton objet 3D ici ===
+  // === 4. Charger l'objet 3D ===
   const loader = new GLTFLoader();
-  const modelURL = "ready_player_me_harry_potter.glb"; // 🔹 Remplace par ton lien .glb/.gltf
+  const modelURL = "https://modelviewer.dev/shared-assets/models/Astronaut.glb"; // 🔹 Remplace par ton propre lien .glb
   loader.load(modelURL, (gltf) => {
     model = gltf.scene;
-    model.scale.set(1.2, 1.2, 1.2);
-    model.position.set(0, 0, 0);
+    model.scale.set(1.5, 1.5, 1.5);
     scene.add(model);
+  }, undefined, (error) => {
+    console.error("Erreur de chargement du modèle :", error);
   });
 
-  // === 5. Contrôles tactiles ===
+  // === 5. Contrôles utilisateur ===
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.enableZoom = true;
   controls.enablePan = true;
-  controls.target.set(0, 0.5, 0);
+  controls.target.set(0, 1, 0);
 
-  // === 6. Boucle d'animation ===
+  // === 6. Boucle d’animation ===
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
@@ -129,7 +137,7 @@ function initScene() {
   }
   animate();
 
-  // === 7. Redimensionner ===
+  // Resize
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -137,5 +145,6 @@ function initScene() {
   });
 }
 </script>
+
 </body>
 </html>

@@ -3,53 +3,87 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
-<title>Simulation AR — pas d'autorisation</title>
+<title>Progressive AR (caméra si acceptée, sinon simulation)</title>
 <style>
   html,body{height:100%;margin:0;background:#000;overflow:hidden}
-  #bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;pointer-events:none}
+  #camera, #bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;pointer-events:none}
   #logo{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:6;transition:all .9s;pointer-events:none}
   #logo.animate{bottom:45%;transform:translateX(-50%) scale(2)}
-  #model-container{position:absolute;top:50%;left:50%;width:320px;height:320px;transform:translate(-50%,-50%);z-index:5;touch-action:none}
+  #model-container{position:absolute;top:60%;left:50%;width:300px;height:300px;transform:translate(-50%,-50%);z-index:5;touch-action:none}
   model-viewer{width:100%;height:100%;display:block}
-  #note{position:fixed;top:8px;left:8px;color:#fff;z-index:7;font-size:13px;opacity:.9}
+  #note{position:fixed;top:10px;left:10px;color:#fff;z-index:7;font-size:13px;opacity:.95}
 </style>
 <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
 <body>
-  <!-- Remplace background.mp4 par une vidéo locale ou utilise <img id="bg" src="background.jpg"> -->
-  <video id="bg" autoplay loop muted playsinline src="background.mp4"></video>
+  <video id="camera" autoplay playsinline></video>
+  <video id="bg" autoplay loop muted playsinline src="background.mp4" style="display:none"></video>
 
-  <div id="note">Simulation AR — arrière-plan local (pas de permission caméra)</div>
+  <div id="note">Tentative d'accéder à la caméra... (si refusée on bascule sur la simulation)</div>
 
-  <div id="model-container">
-    <model-viewer src="youtube_logo.glb" alt="logo 3D" camera-controls autoplay reveal="interaction" shadow-intensity="1"></model-viewer>
+  <div id="model-container" style="display:none;opacity:0">
+    <model-viewer id="mv" src="youtube_logo.glb" alt="logo 3D"
+                  ar ar-modes="webxr scene-viewer quick-look"
+                  camera-controls autoplay reveal="interaction" shadow-intensity="1">
+    </model-viewer>
   </div>
 
   <div id="logo"><img src="LogoAr.png" alt="logo" height="25"></div>
 
-  <script>
-    // simple animation logo
-    const logo = document.getElementById('logo');
-    setTimeout(()=>logo.classList.add('animate'),100);
-    setTimeout(()=>logo.classList.remove('animate'),3100);
+<script>
+  const cam = document.getElementById('camera');
+  const bg = document.getElementById('bg');
+  const modelContainer = document.getElementById('model-container');
+  const note = document.getElementById('note');
+  const logo = document.getElementById('logo');
 
-    // gestes pour déplacer/zoomer/rouler le container (touch)
-    (function(){
-      const el = document.getElementById('model-container');
-      let dx=0,dy=0,scale=1,rot=0,startX=0,startY=0,initDist=0,initScale=1,initAngle=0,initRot=0;
-      function dist(t){const[a,b]=t;return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}
-      function ang(t){const[a,b]=t;return Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)}
-      el.addEventListener('touchstart',e=>{
-        if(e.touches.length===1){ startX=e.touches[0].clientX-dx; startY=e.touches[0].clientY-dy; }
-        else if(e.touches.length===2){ initDist=dist(e.touches); initScale=scale; initAngle=ang(e.touches); initRot=rot; }
-      },{passive:false});
-      el.addEventListener('touchmove',e=>{
-        e.preventDefault();
-        if(e.touches.length===1){ dx=e.touches[0].clientX-startX; dy=e.touches[0].clientY-startY; }
-        else if(e.touches.length===2){ const nd=dist(e.touches); if(initDist>0) scale=Math.max(0.2, initScale*(nd/initDist)); const na=ang(e.touches); rot=initRot + (na-initAngle)*(180/Math.PI); }
-        el.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot}deg) scale(${scale})`;
-      },{passive:false});
-    })();
-  </script>
+  // lance l'animation du logo
+  setTimeout(()=>logo.classList.add('animate'),100);
+  setTimeout(()=>logo.classList.remove('animate'),3100);
+
+  // tente d'ouvrir la caméra
+  async function tryCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      cam.srcObject = stream;
+      cam.style.display = 'block';
+      bg.style.display = 'none';
+      note.textContent = 'Caméra activée — AR réel disponible via le bouton AR.';
+      showModel();
+    } catch (err) {
+      // si refus ou erreur, on tombe sur la simulation (bg vidéo)
+      console.warn('Caméra indisponible / refusée:', err);
+      cam.style.display = 'none';
+      bg.style.display = 'block';
+      note.textContent = 'Simulation active (caméra non disponible). Pour AR réel, autorisez la caméra.';
+      showModel();
+    }
+  }
+
+  function showModel() {
+    modelContainer.style.display = 'block';
+    setTimeout(()=>modelContainer.style.opacity = '1',100);
+    initGestures(modelContainer);
+  }
+
+  // gestures (mêmes que précédemment)
+  function initGestures(el) {
+    let dx=0,dy=0,scale=1,rot=0,startX=0,startY=0,initDist=0,initScale=1,initAngle=0,initRot=0;
+    function dist(t){const[a,b]=t;return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}
+    function ang(t){const[a,b]=t;return Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)}
+    el.addEventListener('touchstart',e=>{
+      if(e.touches.length===1){ startX=e.touches[0].clientX-dx; startY=e.touches[0].clientY-dy; }
+      else if(e.touches.length===2){ initDist=dist(e.touches); initScale=scale; initAngle=ang(e.touches); initRot=rot; }
+    },{passive:false});
+    el.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      if(e.touches.length===1){ dx=e.touches[0].clientX-startX; dy=e.touches[0].clientY-startY; }
+      else if(e.touches.length===2){ const nd=dist(e.touches); if(initDist>0) scale=Math.max(0.2, initScale*(nd/initDist)); const na=ang(e.touches); rot=initRot + (na-initAngle)*(180/Math.PI); }
+      el.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot}deg) scale(${scale})`;
+    },{passive:false});
+  }
+
+  tryCamera();
+</script>
 </body>
 </html>

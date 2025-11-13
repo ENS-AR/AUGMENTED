@@ -3,159 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>AR avec logo animé</title>
+<title>AR - Manuel Immersif</title>
+
+<!-- Librairies A-Frame + MindAR -->
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.4/dist/mindar-image-aframe.prod.js"></script>
+
 <style>
   html, body {
     margin: 0;
     height: 100%;
     overflow: hidden;
     background: #000;
-    touch-action: none;
   }
 
-  video {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 1;
-  }
-
-  /* === Logo fixe + animation preload === */
   #logo-bottom {
     position: fixed;
     bottom: 10px;
     left: 50%;
-    transform: translateX(-50%) scale(1);
-    z-index: 3;
-    transition: all 1s ease;
+    transform: translateX(-50%);
+    z-index: 10;
   }
 
   #logo-bottom img {
     height: 25px;
-    width: auto;
-    transition: transform 1s ease;
-  }
-
-  /* État d'animation (logo monte et grossit) */
-  #logo-bottom.animate {
-    bottom: 45%;
-    transform: translateX(-50%) scale(2);
-  }
-
-  /* Image interactive sur la caméra */
-  #floating-image {
-    position: absolute;
-    top: 60%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(0deg) scale(1);
-    width: 200px;
-    height: auto;
-    border-radius: 10px;
-    z-index: 3;
-    display: none;
-    opacity: 0;
-    transition: transform 0.2s ease, opacity 0.6s ease;
   }
 </style>
 </head>
+
 <body>
 
-<video id="camera" autoplay playsinline></video>
+<!-- === Scène AR === -->
+<a-scene
+  mindar-image="imageTargetSrc: assets/manuel-immersif.mind; autoStart: true;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: true">
 
-<!-- Image interactive -->
-<img id="floating-image" src="MANUEL IMMERSIF V1-3.jpg" alt="Objet interactif">
+  <!-- Caméra -->
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-<!-- Logo fixe (sert aussi de preload) -->
+  <!-- Cible : ton image MANUEL IMMERSIF V1-3.jpg -->
+  <a-entity mindar-image-target="targetIndex: 0">
+    <!-- L’objet à afficher quand la cible est reconnue -->
+    <a-image
+      src="MANUEL IMMERSIF V1-3.jpg"
+      position="0 0 0"
+      rotation="0 0 0"
+      scale="1 1 1"
+      animation="property: rotation; to: 0 360 0; loop: true; dur: 4000; easing: linear">
+    </a-image>
+  </a-entity>
+</a-scene>
+
+<!-- Logo bas fixe -->
 <div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
-
-<script>
-const video = document.getElementById('camera');
-const logo = document.getElementById('logo-bottom');
-const floatingImage = document.getElementById('floating-image');
-
-// === 1. Ouvrir la caméra ===
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
-      audio: false
-    });
-    video.srcObject = stream;
-  } catch (err) {
-    console.error("Erreur caméra :", err);
-  }
-}
-startCamera();
-
-// === 2. Lancer animation du logo (préload) ===
-setTimeout(() => {
-  logo.classList.add('animate');
-}, 100);
-
-// === 3. Revenir à la position bas après 3 secondes ===
-setTimeout(() => {
-  logo.classList.remove('animate');
-  showInteractiveImage();
-}, 3100);
-
-// === 4. Afficher image interactive ===
-function showInteractiveImage() {
-  floatingImage.style.display = 'block';
-  setTimeout(() => floatingImage.style.opacity = '1', 100);
-  initGestures(floatingImage);
-}
-
-// === 5. Gestes tactiles (déplacer, zoomer, tourner) ===
-function initGestures(el) {
-  let posX = window.innerWidth/2, posY = window.innerHeight/1.6;
-  let scale = 1, rotation = 0;
-  let startX=0, startY=0;
-  let initDist=0, initScale=1, initAngle=0, initRotation=0;
-
-  function getDistance(touches) {
-    const [t1, t2] = touches;
-    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-  }
-  function getAngle(touches) {
-    const [t1, t2] = touches;
-    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
-  }
-
-  el.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) {
-      startX = e.touches[0].clientX - posX;
-      startY = e.touches[0].clientY - posY;
-    } else if (e.touches.length === 2) {
-      initDist = getDistance(e.touches);
-      initScale = scale;
-      initAngle = getAngle(e.touches);
-      initRotation = rotation;
-    }
-  });
-
-  el.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      posX = e.touches[0].clientX - startX;
-      posY = e.touches[0].clientY - startY;
-    } else if (e.touches.length === 2) {
-      const newDist = getDistance(e.touches);
-      scale = initScale * (newDist / initDist);
-      const newAngle = getAngle(e.touches);
-      rotation = initRotation + (newAngle - initAngle) * (180/Math.PI);
-    }
-    el.style.transform = `translate(${posX - window.innerWidth/2}px, ${posY - window.innerHeight/2}px) rotate(${rotation}deg) scale(${scale})`;
-  });
-}
-</script>
 
 </body>
 </html>
-
-
-
-ajouter une image target ou trigger pour afficher l'objet 
-
-
-

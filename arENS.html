@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>AR Objet 3D avec logo animé</title>
+<title>AR avec logo animé</title>
 <style>
   html, body {
     margin: 0;
@@ -21,52 +21,60 @@
     z-index: 1;
   }
 
-  canvas {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 2;
-    display: none;
-  }
-
-  /* Logo fixe en bas */
+  /* === Logo fixe + animation preload === */
   #logo-bottom {
     position: fixed;
     bottom: 10px;
     left: 50%;
     transform: translateX(-50%) scale(1);
     z-index: 3;
-    transition: all 3s ease;
+    transition: all 1s ease;
   }
 
   #logo-bottom img {
-    height: 60px;
+    height: 25px;
     width: auto;
-    filter: drop-shadow(0 0 20px cyan);
-    transition: transform 3s ease;
+    transition: transform 1s ease;
   }
 
+  /* État d'animation (logo monte et grossit) */
   #logo-bottom.animate {
     bottom: 45%;
     transform: translateX(-50%) scale(2);
+  }
+
+  /* Image interactive sur la caméra */
+  #floating-image {
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    width: 200px;
+    height: auto;
+    border-radius: 10px;
+    z-index: 3;
+    display: none;
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.6s ease;
   }
 </style>
 </head>
 <body>
 
 <video id="camera" autoplay playsinline></video>
+
+<!-- Image interactive -->
+<img id="floating-image" src="MANUEL IMMERSIF V1-3.jpg" alt="Objet interactif">
+
+<!-- Logo fixe (sert aussi de preload) -->
 <div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
 
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
-
+<script>
 const video = document.getElementById('camera');
 const logo = document.getElementById('logo-bottom');
-let renderer, scene, camera, model;
+const floatingImage = document.getElementById('floating-image');
 
-// === 1. Démarrage caméra ===
+// === 1. Ouvrir la caméra ===
 async function startCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -75,76 +83,79 @@ async function startCamera() {
     });
     video.srcObject = stream;
   } catch (err) {
-    console.warn("Caméra arrière non dispo, on passe à la frontale.");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      video.srcObject = stream;
-    } catch (err2) {
-      alert("Impossible d'accéder à la caméra : " + err2.message);
-    }
+    console.error("Erreur caméra :", err);
   }
 }
 startCamera();
 
-// === 2. Animation du logo (préload) ===
-setTimeout(() => logo.classList.add('animate'), 100);
+// === 2. Lancer animation du logo (préload) ===
+setTimeout(() => {
+  logo.classList.add('animate');
+}, 100);
+
+// === 3. Revenir à la position bas après 3 secondes ===
 setTimeout(() => {
   logo.classList.remove('animate');
-  initScene();
+  showInteractiveImage();
 }, 3100);
 
-// === 3. Initialisation Three.js ===
-function initScene() {
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 1, 3);
+// === 4. Afficher image interactive ===
+function showInteractiveImage() {
+  floatingImage.style.display = 'block';
+  setTimeout(() => floatingImage.style.opacity = '1', 100);
+  initGestures(floatingImage);
+}
 
-  renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-  renderer.domElement.style.display = 'block';
+// === 5. Gestes tactiles (déplacer, zoomer, tourner) ===
+function initGestures(el) {
+  let posX = window.innerWidth/2, posY = window.innerHeight/1.6;
+  let scale = 1, rotation = 0;
+  let startX=0, startY=0;
+  let initDist=0, initScale=1, initAngle=0, initRotation=0;
 
-  // Lumières
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(2, 4, 5);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  function getDistance(touches) {
+    const [t1, t2] = touches;
+    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  }
+  function getAngle(touches) {
+    const [t1, t2] = touches;
+    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+  }
 
-  // === 4. Charger ton modèle GLB ===
-  const loader = new GLTFLoader();
-  const modelURL = "ready_player_me_harry_potter.glb"; // 👈 ton fichier 3D
-  loader.load(modelURL, (gltf) => {
-    model = gltf.scene;
-    model.scale.set(1.5, 1.5, 1.5);
-    model.position.set(0, 0, 0);
-    scene.add(model);
-  }, undefined, (error) => {
-    console.error("Erreur chargement modèle :", error);
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      startX = e.touches[0].clientX - posX;
+      startY = e.touches[0].clientY - posY;
+    } else if (e.touches.length === 2) {
+      initDist = getDistance(e.touches);
+      initScale = scale;
+      initAngle = getAngle(e.touches);
+      initRotation = rotation;
+    }
   });
 
-  // === 5. Contrôles tactiles ===
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.enableZoom = true;
-  controls.enablePan = true;
-  controls.target.set(0, 1, 0);
-
-  // === 6. Animation ===
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  // === 7. Resize ===
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+  el.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      posX = e.touches[0].clientX - startX;
+      posY = e.touches[0].clientY - startY;
+    } else if (e.touches.length === 2) {
+      const newDist = getDistance(e.touches);
+      scale = initScale * (newDist / initDist);
+      const newAngle = getAngle(e.touches);
+      rotation = initRotation + (newAngle - initAngle) * (180/Math.PI);
+    }
+    el.style.transform = `translate(${posX - window.innerWidth/2}px, ${posY - window.innerHeight/2}px) rotate(${rotation}deg) scale(${scale})`;
   });
 }
 </script>
 
 </body>
 </html>
+
+
+
+ajouter une image target ou trigger pour afficher l'objet 
+
+
+

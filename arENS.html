@@ -1,90 +1,155 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
-<title>Progressive AR (caméra si acceptée, sinon simulation)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title> MANUEL AR - VIDEO </title>
 <style>
-  html,body{height:100%;margin:0;background:#000;overflow:hidden}
-  #camera, #bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;pointer-events:none}
-  #logo{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);z-index:6;transition:all .9s;pointer-events:none}
-  #logo.animate{bottom:45%;transform:translateX(-50%) scale(2)}
-  #model-container{position:absolute;top:60%;left:50%;width:300px;height:300px;transform:translate(-50%,-50%);z-index:5;touch-action:none}
-  model-viewer{width:100%;height:100%;display:block}
-  #note{position:fixed;top:10px;left:10px;color:#fff;z-index:7;font-size:13px;opacity:.95}
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    touch-action: none;
+  }
+
+  video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 1;
+  }
+
+  #logo-bottom {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%) scale(1);
+    z-index: 3;
+    transition: all 1s ease;
+  }
+
+  #logo-bottom img {
+    height: 25px;
+    width: auto;
+    transition: transform 1s ease;
+  }
+
+  #logo-bottom.animate {
+    bottom: 45%;
+    transform: translateX(-50%) scale(2);
+  }
+
+  /* Conteneur vidéo YouTube */
+  #floating-video {
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+    width: 300px;
+    height: 170px;
+    border-radius: 10px;
+    z-index: 3;
+    display: none;
+    opacity: 0;
+    transition: transform 0.2s ease, opacity 0.6s ease;
+    background: #000;
+  }
+
+  #floating-video iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 10px;
+  }
 </style>
-<script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 </head>
 <body>
-  <video id="camera" autoplay playsinline></video>
-  <video id="bg" autoplay loop muted playsinline src="background.mp4" style="display:none"></video>
 
-  <div id="note">Tentative d'accéder à la caméra... (si refusée on bascule sur la simulation)</div>
+<video id="camera" autoplay playsinline></video>
 
-  <div id="model-container" style="display:none;opacity:0">
-    <model-viewer id="mv" src="MANUEL IMMERSIF V1-3.jpg" alt="logo 3D"
-                  ar ar-modes="webxr scene-viewer quick-look"
-                  camera-controls autoplay reveal="interaction" shadow-intensity="1">
-    </model-viewer>
-  </div>
+<div id="floating-video">
+  <iframe src="https://www.youtube.com/watch?v=mL5ijP7YJOk" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
 
-  <div id="logo"><img src="LogoAr.png" alt="logo" height="25"></div>
+<div id="logo-bottom"><img src="LogoAr.png" alt="Logo Bas"></div>
 
 <script>
-  const cam = document.getElementById('camera');
-  const bg = document.getElementById('bg');
-  const modelContainer = document.getElementById('model-container');
-  const note = document.getElementById('note');
-  const logo = document.getElementById('logo');
+const video = document.getElementById('camera');
+const logo = document.getElementById('logo-bottom');
+const floatingVideo = document.getElementById('floating-video');
 
-  // lance l'animation du logo
-  setTimeout(()=>logo.classList.add('animate'),100);
-  setTimeout(()=>logo.classList.remove('animate'),3100);
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false
+    });
+    video.srcObject = stream;
+  } catch (err) {
+    console.error("Erreur caméra :", err);
+  }
+}
+startCamera();
 
-  // tente d'ouvrir la caméra
-  async function tryCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-      cam.srcObject = stream;
-      cam.style.display = 'block';
-      bg.style.display = 'none';
-      note.textContent = 'Caméra activée — AR réel disponible via le bouton AR.';
-      showModel();
-    } catch (err) {
-      // si refus ou erreur, on tombe sur la simulation (bg vidéo)
-      console.warn('Caméra indisponible / refusée:', err);
-      cam.style.display = 'none';
-      bg.style.display = 'block';
-      note.textContent = 'Simulation active (caméra non disponible). Pour AR réel, autorisez la caméra.';
-      showModel();
+setTimeout(() => {
+  logo.classList.add('animate');
+}, 100);
+
+setTimeout(() => {
+  logo.classList.remove('animate');
+  showFloatingVideo();
+}, 3100);
+
+function showFloatingVideo() {
+  floatingVideo.style.display = 'block';
+  setTimeout(() => floatingVideo.style.opacity = '1', 100);
+  initGestures(floatingVideo);
+}
+
+function initGestures(el) {
+  let posX = window.innerWidth/2, posY = window.innerHeight/1.6;
+  let scale = 1, rotation = 0;
+  let startX=0, startY=0;
+  let initDist=0, initScale=1, initAngle=0, initRotation=0;
+
+  function getDistance(touches) {
+    const [t1, t2] = touches;
+    return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  }
+  function getAngle(touches) {
+    const [t1, t2] = touches;
+    return Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+  }
+
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      startX = e.touches[0].clientX - posX;
+      startY = e.touches[0].clientY - posY;
+    } else if (e.touches.length === 2) {
+      initDist = getDistance(e.touches);
+      initScale = scale;
+      initAngle = getAngle(e.touches);
+      initRotation = rotation;
     }
-  }
+  });
 
-  function showModel() {
-    modelContainer.style.display = 'block';
-    setTimeout(()=>modelContainer.style.opacity = '1',100);
-    initGestures(modelContainer);
-  }
-
-  // gestures (mêmes que précédemment)
-  function initGestures(el) {
-    let dx=0,dy=0,scale=1,rot=0,startX=0,startY=0,initDist=0,initScale=1,initAngle=0,initRot=0;
-    function dist(t){const[a,b]=t;return Math.hypot(b.clientX-a.clientX,b.clientY-a.clientY)}
-    function ang(t){const[a,b]=t;return Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)}
-    el.addEventListener('touchstart',e=>{
-      if(e.touches.length===1){ startX=e.touches[0].clientX-dx; startY=e.touches[0].clientY-dy; }
-      else if(e.touches.length===2){ initDist=dist(e.touches); initScale=scale; initAngle=ang(e.touches); initRot=rot; }
-    },{passive:false});
-    el.addEventListener('touchmove',e=>{
-      e.preventDefault();
-      if(e.touches.length===1){ dx=e.touches[0].clientX-startX; dy=e.touches[0].clientY-startY; }
-      else if(e.touches.length===2){ const nd=dist(e.touches); if(initDist>0) scale=Math.max(0.2, initScale*(nd/initDist)); const na=ang(e.touches); rot=initRot + (na-initAngle)*(180/Math.PI); }
-      el.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot}deg) scale(${scale})`;
-    },{passive:false});
-  }
-
-  tryCamera();
+  el.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      posX = e.touches[0].clientX - startX;
+      posY = e.touches[0].clientY - startY;
+    } else if (e.touches.length === 2) {
+      const newDist = getDistance(e.touches);
+      scale = initScale * (newDist / initDist);
+      const newAngle = getAngle(e.touches);
+      rotation = initRotation + (newAngle - initAngle) * (180/Math.PI);
+    }
+    el.style.transform = `translate(${posX - window.innerWidth/2}px, ${posY - window.innerHeight/2}px) rotate(${rotation}deg) scale(${scale})`;
+  });
+}
 </script>
+
 </body>
 </html>
-
